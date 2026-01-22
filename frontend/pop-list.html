@@ -1,0 +1,70 @@
+<!--frontend/pop_front/pop-list.html -->
+
+<!doctype html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>POPs - Serviço/Manutenção</title>
+    <link rel="stylesheet" href="./css/style.css" />
+</head>
+
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div>
+                <h1>POPs — Serviço / Manutenção</h1>
+                <div class="sub">Lista simples para consulta no chão de fábrica (desktop ou celular).</div>
+            </div>
+            <div class="badge" id="apiBadge">API: <span id="apiBase"></span></div>
+
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <a class="btn primary" href="./pop-create.html">Cadastrar POP</a>
+            </div>
+
+        </div>
+
+        <div class="card">
+            <div class="row cols-3">
+                <div>
+                    <label for="linkType">Tipo de vínculo (LINK_TYPE)</label>
+                    <select id="linkType">
+                        <option value="">(todos)</option>
+                        <option value="SERVICO">SERVICO</option>
+                        <option value="MAQUINA">MAQUINA</option>
+                        <option value="TAREFA">TAREFA</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="codMaquina">Código da Máquina (opcional)</label>
+                    <input id="codMaquina" placeholder="Ex: MAQ01" />
+                </div>
+
+                <div style="display:flex; gap:10px; align-items:flex-end;">
+                    <button class="btn primary" id="btnBuscar">Buscar</button>
+                    <button class="btn" id="btnLimpar">Limpar</button>
+                </div>
+
+            </div>
+
+            <hr class="sep" />
+
+            <div class="row cols-2">
+                <div class="badge">Dica: use <b>MAQUINA + COD_MAQUINA</b> para manutenção rotineira.</div>
+                <div class="badge">Clique em <b>Ver</b> para abrir o POP completo.</div>
+            </div>
+        </div>
+
+
+        <div class="card">
+            <div id="status" class="muted">Carregando...</div>
+            <div class="list" id="list"></div>
+        </div>
+    </div>
+
+    <script type="module" src="./js/pop-list.js"></script>
+</body>
+
+</html>

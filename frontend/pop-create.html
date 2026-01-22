@@ -1,0 +1,252 @@
+<!--frontend/pop_front/pop-create.html -->
+
+<!doctype html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Cadastrar POP</title>
+    <link rel="stylesheet" href="./css/style.css" />
+</head>
+
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div>
+                <h1>Cadastrar POP</h1>
+                <div class="sub">Template → Versão → Steps → Link (com TYPE primeiro e preenchimento automático).</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <a class="btn" href="./pop-list.html">Voltar</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="badge">Etapa <b id="stepNum">1</b>/4 — <span id="stepName">Template</span></div>
+            <hr class="sep" />
+
+            <!-- ETAPA 1 -->
+            <div id="step1">
+                <div class="row cols-2">
+                    <div>
+                        <label>TYPE *</label>
+                        <select id="t_type">
+                            <option value="MAQUINA">MAQUINA</option>
+                            <option value="SERVICO">SERVICO</option>
+                            <option value="OPERACAO">OPERACAO</option>
+                            <option value="PECA">PECA</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>CODE (opcional)</label>
+                        <input id="t_code" placeholder="Ex: POP-0001" />
+                    </div>
+                </div>
+
+                <!-- BLOCO MAQUINA -->
+                <div id="blockMachine" style="margin-top:10px; display:none;">
+                    <label>Máquina (do sistema)</label>
+                    <select id="machineSelect"></select>
+                    <div class="muted" style="font-size:12px; margin-top:6px;">Puxado de J_MAQUINA</div>
+                </div>
+
+                <!-- BLOCO TAREFA -->
+                <div id="blockTask" style="margin-top:10px; display:none;">
+                    <label>Tarefa (do sistema)</label>
+                    <select id="taskSelect"></select>
+                    <div class="muted" style="font-size:12px; margin-top:6px;">Puxado de J_TAREFAS</div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label>TITLE *</label>
+                    <input id="t_title" placeholder="Ex: Ligar máquina / Limpeza / Setup..." />
+                </div>
+
+                <div class="row cols-2" style="margin-top:10px;">
+                    <div>
+                        <label>DUR_PADRAO (segundos)</label>
+                        <input id="t_dur" type="number" placeholder="Ex: 60" />
+                    </div>
+                    <div>
+                        <label>DESCRIPTION</label>
+                        <input id="t_desc" placeholder="Resumo do POP" />
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:14px;">
+                    <button class="btn" id="btnTestApi" data-label="Testar API">Testar API</button>
+                    <button class="btn primary" id="btnCreateTemplate" data-label="Salvar Template">Salvar
+                        Template</button>
+                </div>
+
+                <div id="apiTestResult" class="muted" style="margin-top:10px;"></div>
+                <div id="templateResult" class="muted" style="margin-top:10px;"></div>
+            </div>
+
+            <!-- ETAPA 2 -->
+            <div id="step2" style="display:none;">
+                <div class="row cols-3">
+                    <div>
+                        <label>TEMPLATE_ID</label>
+                        <input id="v_template_id" disabled />
+                    </div>
+                    <div>
+                        <label>VERSION_NUM *</label>
+                        <input id="v_num" type="number" value="1" />
+                    </div>
+                    <div>
+                        <label>ATIVA?</label>
+                        <select id="v_active">
+                            <option value="true" selected>true</option>
+                            <option value="false">false</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label>SUMMARY</label>
+                    <input id="v_summary" placeholder="Ex: v1 inicial" />
+                </div>
+
+                <div class="row cols-2" style="margin-top:10px;">
+                    <div>
+                        <label>COD_MAQUINA</label>
+                        <input id="v_cod_maquina" placeholder="Auto (se TYPE=MAQUINA)" />
+                    </div>
+                    <div>
+                        <label>COD_TAREFA</label>
+                        <input id="v_cod_tarefa" placeholder="Auto (se TYPE=OPERACAO)" />
+                    </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label>CONTENT</label>
+                    <textarea id="v_content" rows="8"
+                        style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text);"></textarea>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:14px;">
+                    <button class="btn primary" id="btnCreateVersion" data-label="Salvar Versão">Salvar Versão</button>
+                </div>
+
+                <div id="versionResult" class="muted" style="margin-top:10px;"></div>
+            </div>
+
+            <!-- ETAPA 3 -->
+            <div id="step3" style="display:none;">
+                <div class="row cols-2">
+                    <div>
+                        <label>VERSION_ID</label>
+                        <input id="s_version_id" disabled />
+                    </div>
+                    <div>
+                        <label>SEQ *</label>
+                        <input id="s_seq" type="number" value="1" />
+                    </div>
+                </div>
+
+                <div class="row cols-2" style="margin-top:10px;">
+                    <div>
+                        <label>TITLE</label>
+                        <input id="s_title" />
+                    </div>
+                    <div>
+                        <label>INSTRUCTION</label>
+                        <input id="s_instruction" />
+                    </div>
+                </div>
+
+                <div class="row cols-2" style="margin-top:10px;">
+                    <div>
+                        <label>REQ_PHOTO</label>
+                        <select id="s_photo">
+                            <option value="false" selected>false</option>
+                            <option value="true">true</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>REQ_SIGN</label>
+                        <select id="s_sign">
+                            <option value="false" selected>false</option>
+                            <option value="true">true</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:14px;">
+                    <button class="btn primary" id="btnAddStep" data-label="Adicionar Step">Adicionar Step</button>
+                    <button class="btn" id="btnNextToLink" data-label="Ir para Link">Ir para Link</button>
+                </div>
+
+                <div id="stepsResult" class="muted" style="margin-top:10px;"></div>
+            </div>
+
+            <!-- ETAPA 4 -->
+            <div id="step4" style="display:none;">
+                <div class="row cols-2">
+                    <div>
+                        <label>VERSION_ID</label>
+                        <input id="l_version_id" disabled />
+                    </div>
+                    <div>
+                        <label>LINK_TYPE *</label>
+                        <select id="l_type">
+                            <option value="MAQUINA">MAQUINA</option>
+                            <option value="SERVICO">SERVICO</option>
+                            <option value="TAREFA">TAREFA</option>
+                            <option value="NP">NP</option>
+                            <option value="PECA">PECA</option>
+                            <option value="PECA_OP">PECA_OP</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row cols-3" style="margin-top:10px;">
+                    <div>
+                        <label>COD_MAQUINA</label>
+                        <input id="l_cod_maquina" placeholder="Auto (se TYPE=MAQUINA)" />
+                    </div>
+                    <div>
+                        <label>COD_TAREFA</label>
+                        <input id="l_cod_tarefa" placeholder="Auto (se TYPE=OPERACAO)" />
+                    </div>
+                    <div>
+                        <label>COD_NP</label>
+                        <input id="l_cod_np" />
+                    </div>
+                </div>
+
+                <div class="row cols-2" style="margin-top:10px;">
+                    <div>
+                        <label>COD_PRODUTO</label>
+                        <input id="l_cod_produto" />
+                    </div>
+                    <div>
+                        <label>COD_SEQ</label>
+                        <input id="l_cod_seq" />
+                    </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label>NOTES</label>
+                    <input id="l_notes" />
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:14px;">
+                    <button class="btn primary" id="btnCreateLink" data-label="Salvar Link (Finalizar)">Salvar Link
+                        (Finalizar)</button>
+                    <a class="btn" href="./pop-list.html">Voltar para Lista</a>
+                </div>
+
+                <div id="linkResult" class="muted" style="margin-top:10px;"></div>
+                <div id="finalResume" class="muted" style="margin-top:10px;"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module" src="./js/pop-create.js"></script>
+</body>
+
+</html>

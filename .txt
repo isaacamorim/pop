@@ -1,0 +1,72 @@
+pop-system/
+│
+├── backend/
+│   └── pop_api/
+│       ├── app.py
+│       ├── config.py
+│       ├── extensions.py
+│       ├── requirements.txt
+│       │
+│       ├── models/
+│       │   ├── __init__.py
+│       │   ├── pop_template.py
+│       │   ├── pop_version.py
+│       │   ├── pop_step.py
+│       │   ├── pop_attachment.py
+│       │   ├── pop_link.py
+│       │   ├── pop_instance.py
+│       │   ├── pop_instance_step.py
+│       │   └── pop_history.py
+│       │
+│       ├── routes/
+│       │   ├── __init__.py
+│       │   ├── pop_templates.py
+│       │   ├── pop_versions.py
+│       │   ├── pop_steps.py
+│       │   ├── pop_attachments.py
+│       │   ├── pop_links.py
+│       │   ├── pop_instances.py
+│       │   └── pop_services.py
+│       │
+│       ├── schemas/          # (opcional no início)
+│       │   ├── __init__.py
+│       │   └── pop.py
+│       │
+│       ├── migrations/
+│       │
+│       └── utils/
+│           ├── __init__.py
+│           └── audit.py
+│
+├── frontend/
+│   └── pop_front/
+│       ├── index.html              # dashboard simples
+│       ├── pop-list.html           # lista POPs serviço/manutenção
+│       ├── pop-view.html           # visualizar POP
+│       ├── pop-create.html         # cadastro de POP
+│       │
+│       ├── css/
+│       │   └── style.css
+│       │
+│       ├── js/
+│       │   ├── api.js              # fetch / axios wrapper
+│       │   ├── pop-list.js
+│       │   ├── pop-view.js
+│       │   └── pop-create.js
+│       │
+│       └── assets/
+│           └── icons/
+│
+└── README.md
+
+
+
+CREATE OR REPLACE TRIGGER TRG_I_POP_TEMPLATE_BI
+BEFORE INSERT ON I_POP_TEMPLATE
+FOR EACH ROW
+BEGIN
+  IF :NEW.IPT_ID IS NULL THEN
+    SELECT SEQ_I_POP_TEMPLATE.NEXTVAL INTO :NEW.IPT_ID FROM DUAL;
+  END IF;
+END;
+/

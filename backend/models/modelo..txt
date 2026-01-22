@@ -1,0 +1,153 @@
+--tabela dos sistema de pop industrial 
+
+-- 1) TEMPLATES
+CREATE TABLE I_POP_TEMPLATE (
+    IPT_ID              BIGSERIAL PRIMARY KEY,        -- ID do template do POP
+    IPT_CODE            VARCHAR(50) UNIQUE,            -- Código legível do POP
+    IPT_TITLE           TEXT NOT NULL,                 -- Título do POP
+    IPT_TYPE            VARCHAR(20) NOT NULL,          -- Tipo: PECA, OPERACAO, MAQUINA, SERVICO
+    IPT_DESCRIPTION     TEXT,                          -- Descrição resumida do POP
+    IPT_DUR_PADRAO      INTEGER,                       -- Duração padrão (segundos)
+    IPT_CREATED_BY      INTEGER,                       -- Usuário que criou
+    IPT_CREATED_AT      TIMESTAMP DEFAULT NOW(),       -- Data de criação
+    IPT_ACTIVE          BOOLEAN DEFAULT TRUE           -- POP ativo/inativo
+);
+
+
+-- 2) VERSIONS (CONTEÚDO REAL)
+CREATE TABLE I_POP_VERSION (
+    IPV_ID              BIGSERIAL PRIMARY KEY,        -- ID da versão do POP
+    IPV_TEMPLATE_ID     BIGINT NOT NULL,               -- Template relacionado
+    IPV_VERSION_NUM     INTEGER NOT NULL,              -- Número da versão
+    IPV_SUMMARY         TEXT,                          -- Resumo da versão
+    IPV_CONTENT         TEXT,                          -- Conteúdo completo do POP (Markdown/HTML)
+    IPV_COD_TAREFA      VARCHAR(50),                   -- Código da tarefa (ERP)
+    IPV_COD_MAQUINA     VARCHAR(50),                   -- Código da máquina
+    IPV_IS_STANDARD     BOOLEAN DEFAULT TRUE,          -- Indica POP padrão
+    IPV_CREATED_BY      INTEGER,                       -- Usuário criador
+    IPV_CREATED_AT      TIMESTAMP DEFAULT NOW(),       -- Data de criação
+    IPV_ACTIVE          BOOLEAN DEFAULT TRUE,          -- Versão ativa
+
+    CONSTRAINT FK_IPV_TEMPLATE
+        FOREIGN KEY (IPV_TEMPLATE_ID)
+        REFERENCES I_POP_TEMPLATE (IPT_ID)
+        ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX UX_IPV_TEMPLATE_VERSION
+ON I_POP_VERSION (IPV_TEMPLATE_ID, IPV_VERSION_NUM);
+
+
+-- 3) STEPS (CHECKLIST SEQUENCIAL)
+CREATE TABLE I_POP_STEP (
+    IPS_ID              BIGSERIAL PRIMARY KEY,        -- ID do passo
+    IPS_VERSION_ID      BIGINT NOT NULL,               -- Versão do POP
+    IPS_SEQ             INTEGER NOT NULL,              -- Ordem do passo
+    IPS_TITLE           TEXT,                          -- Título do passo
+    IPS_INSTRUCTION     TEXT,                          -- Instrução detalhada
+    IPS_REQ_PHOTO       BOOLEAN DEFAULT FALSE,         -- Exige foto
+    IPS_REQ_SIGN        BOOLEAN DEFAULT FALSE,         -- Exige assinatura
+
+    CONSTRAINT FK_IPS_VERSION
+        FOREIGN KEY (IPS_VERSION_ID)
+        REFERENCES I_POP_VERSION (IPV_ID)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IX_IPS_VERSION_SEQ
+ON I_POP_STEP (IPS_VERSION_ID, IPS_SEQ);
+
+
+-- 4) ATTACHMENTS
+CREATE TABLE I_POP_ATTACHMENT (
+    IPA_ID              BIGSERIAL PRIMARY KEY,        -- ID do anexo
+    IPA_VERSION_ID      BIGINT NOT NULL,               -- Versão do POP
+    IPA_FILENAME        TEXT,                          -- Nome do arquivo
+    IPA_MIME            VARCHAR(100),                  -- Tipo MIME
+    IPA_STORAGE_PATH    TEXT,                          -- Caminho do arquivo
+    IPA_UPLOADED_BY     INTEGER,                       -- Usuário que enviou
+    IPA_UPLOADED_AT     TIMESTAMP DEFAULT NOW(),       -- Data do upload
+
+    CONSTRAINT FK_IPA_VERSION
+        FOREIGN KEY (IPA_VERSION_ID)
+        REFERENCES I_POP_VERSION (IPV_ID)
+        ON DELETE CASCADE
+);
+
+-- 5) LINKS / AMARRAÇÃO À NP/PEÇA/OPERAÇÃO
+CREATE TABLE I_POP_LINK (
+    IPL_ID              BIGSERIAL PRIMARY KEY,        -- ID do vínculo do POP
+    IPL_VERSION_ID      BIGINT NOT NULL,               -- Versão do POP
+    IPL_LINK_TYPE       VARCHAR(20) NOT NULL,          -- NP, PECA_OP, PECA, MAQUINA, TAREFA
+    IPL_COD_NP          VARCHAR(50),                   -- Código da NP
+    IPL_COD_PRODUTO     VARCHAR(50),                   -- Código da peça
+    IPL_COD_SEQ         VARCHAR(50),                   -- Sequência da operação
+    IPL_COD_TAREFA      VARCHAR(50),                   -- Código da tarefa
+    IPL_COD_MAQUINA     VARCHAR(50),                   -- Código da máquina
+    IPL_TMP_MAQUINA     DECIMAL,                       -- Tempo máquina
+    IPL_TMP_SETUP       DECIMAL,                       -- Tempo de setup
+    IPL_PROD_HORA       DECIMAL,                       -- Produção por hora
+    IPL_NOTES           TEXT,                          -- Observações
+    IPL_CREATED_AT      TIMESTAMP DEFAULT NOW(),       -- Data de criação
+
+    CONSTRAINT FK_IPL_VERSION
+        FOREIGN KEY (IPL_VERSION_ID)
+        REFERENCES I_POP_VERSION (IPV_ID)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IX_IPL_NP
+ON I_POP_LINK (IPL_COD_NP);
+
+CREATE INDEX IX_IPL_PROD_SEQ
+ON I_POP_LINK (IPL_COD_PRODUTO, IPL_COD_SEQ);
+
+-- 6) EXECUTION INSTANCE (QUANDO APLICADO)
+CREATE TABLE I_POP_INSTANCE (
+    IPI_ID              BIGSERIAL PRIMARY KEY,        -- ID da execução do POP
+    IPI_VERSION_ID      BIGINT NOT NULL,               -- Versão do POP
+    IPI_LINK_ID         BIGINT,                        -- Vínculo aplicado
+    IPI_STARTED_AT      TIMESTAMP DEFAULT NOW(),       -- Início
+    IPI_FINISHED_AT     TIMESTAMP,                     -- Fim
+    IPI_OPERATOR_ID     INTEGER,                       -- Operador
+    IPI_STATUS          VARCHAR(20),                   -- STARTED, PAUSED, COMPLETED, ABORTED
+    IPI_NOTES           TEXT,                          -- Observações
+
+    CONSTRAINT FK_IPI_VERSION
+        FOREIGN KEY (IPI_VERSION_ID)
+        REFERENCES I_POP_VERSION (IPV_ID),
+    CONSTRAINT FK_IPI_LINK
+        FOREIGN KEY (IPI_LINK_ID)
+        REFERENCES I_POP_LINK (IPL_ID)
+);
+
+-- 7) INSTANCE STEP RESULTS (EVIDENCIAS)
+CREATE TABLE I_POP_INSTANCE_STEP (
+    IPRS_ID             BIGSERIAL PRIMARY KEY,        -- ID da evidência
+    IPRS_INSTANCE_ID    BIGINT NOT NULL,               -- Execução do POP
+    IPRS_STEP_ID        BIGINT NOT NULL,               -- Passo do POP
+    IPRS_DONE           BOOLEAN DEFAULT FALSE,         -- Passo concluído
+    IPRS_NOTE           TEXT,                          -- Observação
+    IPRS_PHOTO_PATH     TEXT,                          -- Foto evidência
+    IPRS_RECORDED_AT    TIMESTAMP DEFAULT NOW(),       -- Data do registro
+    
+    CONSTRAINT FK_IPRS_INSTANCE
+        FOREIGN KEY (IPRS_INSTANCE_ID)
+        REFERENCES I_POP_INSTANCE (IPI_ID)
+        ON DELETE CASCADE,
+    CONSTRAINT FK_IPRS_STEP
+        FOREIGN KEY (IPRS_STEP_ID)
+        REFERENCES I_POP_STEP (IPS_ID)
+);
+
+
+-- 8) HISTORY/LOG
+CREATE TABLE I_POP_HISTORY (
+    IPH_ID              BIGSERIAL PRIMARY KEY,        -- ID do histórico
+    IPH_ENTITY_TYPE     VARCHAR(30),                  -- TEMPLATE, VERSION, INSTANCE
+    IPH_ENTITY_ID       BIGINT,                        -- ID da entidade
+    IPH_ACTION          VARCHAR(40),                  -- Ação realizada
+    IPH_USER_ID         INTEGER,                      -- Usuário
+    IPH_PAYLOAD         JSONB,                        -- Dados adicionais
+    IPH_CREATED_AT      TIMESTAMP DEFAULT NOW()       -- Data do evento
+);

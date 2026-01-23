@@ -16,6 +16,7 @@ class PopTemplate(db.Model):
     IPT_CREATED_BY = db.Column(db.Integer)
     IPT_CREATED_AT = db.Column(db.DateTime, server_default=db.FetchedValue())
     IPT_ACTIVE = db.Column(db.Integer, nullable=False, server_default="1")
+    IPT_STATUS = db.Column(db.String(20), nullable=False, server_default="DRAFT")
 
     # relationships
     VERSIONS = db.relationship(
@@ -38,4 +39,6 @@ class PopTemplate(db.Model):
                 self.IPT_CREATED_AT.isoformat() if self.IPT_CREATED_AT else None
             ),
             "ACTIVE": bool(self.IPT_ACTIVE),
+            "STATUS": self.IPT_STATUS,
         }
+

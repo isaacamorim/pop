@@ -1,11 +1,7 @@
 // frontend/pop_front/js/pop-view.js
+import { apiGet } from "./api.js";
 
-import { apiGet, qs } from "./api.js";
-
-function getId() {
-    const url = new URL(window.location.href);
-    return url.searchParams.get("id");
-}
+const qs = (sel, root = document) => root.querySelector(sel);
 
 function escapeHtml(s) {
     return (s ?? "").toString()
@@ -16,81 +12,117 @@ function escapeHtml(s) {
         .replaceAll("'", "&#039;");
 }
 
-function kvRow(k, v) {
-    const div = document.createElement("div");
-    div.innerHTML = `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v ?? "-")}</div>`;
-    return div;
+function getParam(name) {
+    return new URLSearchParams(window.location.search).get(name);
 }
 
-function render(data) {
-    qs("#headerStatus").textContent = `Versão ${data.VERSION_NUM} (ID ${data.ID})`;
+function pick(obj, ...keys) {
+    for (const k of keys) {
+        if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+    }
+    return undefined;
+}
 
-    const kv = qs("#kv");
-    kv.innerHTML = "";
-    kv.appendChild(kvRow("TEMPLATE_ID", data.TEMPLATE_ID));
-    kv.appendChild(kvRow("COD_MAQUINA", data.COD_MAQUINA));
-    kv.appendChild(kvRow("COD_TAREFA", data.COD_TAREFA));
-    kv.appendChild(kvRow("ATIVO", data.ACTIVE ? "SIM" : "NÃO"));
-    kv.appendChild(kvRow("CRIADO EM", data.CREATED_AT));
+function render(pop) {
+    // normaliza campos (aceita maiúsculo e minúsculo)
+    const TITLE = pick(pop, "TITLE", "title") || "POP";
+    const CODE = pick(pop, "CODE", "code") || "-";
+    const STATUS = (pick(pop, "STATUS", "status") || "DRAFT").toUpperCase();
 
-    // content
-    const content = (data.CONTENT ?? "").trim();
-    qs("#content").innerHTML = content ? `<pre style="white-space:pre-wrap; margin:0;">${escapeHtml(content)}</pre>` : `<div class="muted">Sem conteúdo.</div>`;
+    const TEMPLATE_ID = pick(pop, "TEMPLATE_ID", "template_id") || "-";
+    const VERSION_ID = pick(pop, "VERSION_ID", "version_id") || "-";
+    const VERSION_NUM = pick(pop, "VERSION_NUM", "version_num") || "-";
+    const DESCRIPTION = pick(pop, "DESCRIPTION", "description") || "";
 
-    // steps
+    const LINK_TYPE = pick(pop, "LINK_TYPE", "link_type") || "-";
+    const COD_MAQUINA = pick(pop, "COD_MAQUINA", "cod_maquina") || "-";
+    const COD_TAREFA = pick(pop, "COD_TAREFA", "cod_tarefa") || "-";
+    const NP_CODIGO = pick(pop, "NP_CODIGO", "np_codigo") || "-";
+    const SEQ_COD = pick(pop, "SEQ_COD", "seq_cod") || "-";
+    const PRODUCT_CODE = pick(pop, "PRODUCT_CODE", "product_code") || "-";
+    const NOTES = pick(pop, "NOTES", "notes");
+
+    const STEPS = pick(pop, "STEPS", "steps") || [];
+
+    qs("#title").textContent = pop.title || "POP";
+    qs("#subtitle").textContent = `${pop.code || "-"} • STATUS: ${(pop.status || "DRAFT").toUpperCase()}`;
+
+    const steps = pop.steps || [];
+    
+    qs("#status").innerHTML = `
+        <div class="badge">TEMPLATE_ID: <b>${escapeHtml(TEMPLATE_ID)}</b></div>
+        <div class="badge">VERSION_ID: <b>${escapeHtml(VERSION_ID)}</b></div>
+        <div class="badge">VERSÃO: <b>${escapeHtml(VERSION_NUM)}</b></div>
+        ${DESCRIPTION ? `<div style="margin-top:10px;">${escapeHtml(DESCRIPTION)}</div>` : ""}
+        `;
+
+
+    qs("#link").innerHTML = `
+    <div class="row cols-3">
+        <div class="badge">LINK_TYPE: <b>${escapeHtml(LINK_TYPE)}</b></div>
+        <div class="badge">MAQUINA: <b>${escapeHtml(COD_MAQUINA)}</b></div>
+        <div class="badge">TAREFA: <b>${escapeHtml(COD_TAREFA)}</b></div>
+        <div class="badge">NP: <b>${escapeHtml(NP_CODIGO)}</b></div>
+        <div class="badge">SEQ: <b>${escapeHtml(SEQ_COD)}</b></div>
+        <div class="badge">PROD: <b>${escapeHtml(PRODUCT_CODE)}</b></div>
+    </div>
+    ${NOTES ? `<div style="margin-top:10px;"><b>Obs:</b> ${escapeHtml(NOTES)}</div>` : ""}
+    `;
+
     const stepsEl = qs("#steps");
     stepsEl.innerHTML = "";
-    if (data.STEPS?.length) {
-        for (const s of data.STEPS) {
-            const step = document.createElement("div");
-            step.className = "step";
-            step.innerHTML = `
-        <div class="head">
-          <div><span class="num">#${s.SEQ}</span> ${escapeHtml(s.TITLE || "")}</div>
-          <div class="req">
-            ${s.REQ_PHOTO ? `<span class="pill">📷 Foto</span>` : ``}
-            ${s.REQ_SIGN ? `<span class="pill">✍️ Assinatura</span>` : ``}
-          </div>
-        </div>
-        <div class="muted" style="margin-top:8px;">${escapeHtml(s.INSTRUCTION || "")}</div>
-      `;
-            stepsEl.appendChild(step);
-        }
-    } else {
-        stepsEl.innerHTML = `<div class="muted">Sem checklist.</div>`;
+
+    if (!STEPS.length) {
+        stepsEl.innerHTML = `<div class="alert">Nenhum passo cadastrado.</div>`;
+        return;
     }
 
-    // attachments
-    const attachEl = qs("#attach");
-    attachEl.innerHTML = "";
-    if (data.ATTACHMENTS?.length) {
-        for (const a of data.ATTACHMENTS) {
-            const path = a.STORAGE_PATH || "";
-            const name = a.FILENAME || path || "Anexo";
-            const link = document.createElement("a");
-            link.href = path || "#";
-            link.textContent = name;
-            link.target = "_blank";
-            attachEl.appendChild(link);
-        }
-    } else {
-        attachEl.innerHTML = `<div class="muted">Sem anexos.</div>`;
+    for (const s of STEPS) {
+        const SEQ = pick(s, "SEQ", "seq") || "";
+        const ST = pick(s, "TITLE", "title") || "(sem título)";
+        const INS = pick(s, "INSTRUCTION", "instruction") || "";
+        const PHOTO = !!pick(s, "REQUIRES_PHOTO", "requires_photo");
+        const SIGN = !!pick(s, "REQUIRES_SIGNATURE", "requires_signature");
+
+        const div = document.createElement("div");
+        div.className = "card item";
+        div.innerHTML = `
+      <div class="title">${escapeHtml(SEQ)}. ${escapeHtml(ST)}</div>
+      <div class="small" style="margin-top:6px;">${escapeHtml(INS)}</div>
+      <div class="small" style="margin-top:8px;">
+        <span class="badge">Foto: <b>${PHOTO ? "SIM" : "NÃO"}</b></span>
+        <span class="badge">Assinatura: <b>${SIGN ? "SIM" : "NÃO"}</b></span>
+      </div>
+    `;
+        stepsEl.appendChild(div);
     }
 }
 
-async function load() {
-    const id = getId();
-    if (!id) {
-        qs("#headerStatus").innerHTML = `<div class="alert">Faltou o parâmetro <b>?id=</b> na URL.</div>`;
+async function init() {
+    const templateId = getParam("template_id");
+    if (!templateId) {
+        qs("#status").innerHTML = `<div class="alert">Faltou template_id na URL.</div>`;
         return;
     }
 
     try {
-        const data = await apiGet(`/api/services/${encodeURIComponent(id)}`);
-        render(data);
-    } catch (err) {
-        qs("#headerStatus").innerHTML = `<div class="alert">Erro ao carregar: ${escapeHtml(err.message)}</div>`;
+        const pop = await apiGet(`/api/pops/${encodeURIComponent(templateId)}`);
+
+        console.log("POP RAW =>", pop);
+        const dbg = qs("#debug");
+        const DEBUG = false;
+
+        if (dbg) {
+            dbg.style.display = DEBUG ? "" : "none";
+            dbg.textContent = DEBUG ? JSON.stringify(pop, null, 2) : "";
+        }
+
+
+        render(pop);
+    } catch (e) {
+        console.error(e);
+        qs("#status").innerHTML = `<div class="alert">Erro: ${escapeHtml(e.message || e)}</div>`;
     }
 }
 
-load();
+init();

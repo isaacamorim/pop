@@ -6,7 +6,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Visualizar POP</title>
+    <title>Ver POP</title>
     <link rel="stylesheet" href="./css/style.css" />
 </head>
 
@@ -14,35 +14,27 @@
     <div class="container">
         <div class="topbar">
             <div>
-                <h1>Visualizar POP</h1>
-                <div class="sub">Exibe conteúdo, checklist e anexos da versão.</div>
+                <h1 id="title">POP</h1>
+                <div class="sub" id="subtitle"></div>
             </div>
             <div style="display:flex; gap:10px;">
                 <a class="btn" href="./pop-list.html">Voltar</a>
             </div>
         </div>
 
-        <div class="card" id="headerCard">
-            <div id="headerStatus" class="muted">Carregando...</div>
-            <div class="kv" id="kv"></div>
+        <div class="card">
+            <div id="status" class="muted">Carregando...</div>
+            <pre id="debug" style="display:none;"></pre>
         </div>
 
-        <div class="card" id="contentCard">
-            <h1 style="font-size:16px; margin-bottom:8px;">Conteúdo</h1>
-            <div id="content" class="muted"></div>
+        <div class="card">
+            <h3>Vínculo</h3>
+            <div id="link"></div>
         </div>
 
-        <div class="card" id="stepsCard">
-            <h1 style="font-size:16px; margin-bottom:8px;">Checklist</h1>
-            <div id="steps" class="steps"></div>
-        </div>
-
-        <div class="card" id="attachCard">
-            <h1 style="font-size:16px; margin-bottom:8px;">Anexos</h1>
-            <div id="attach" class="attach"></div>
-            <div class="muted" style="font-size:12px; margin-top:8px;">
-                (Os anexos apontam para IPA_STORAGE_PATH. Se for caminho de rede, pode precisar de acesso no PC.)
-            </div>
+        <div class="card">
+            <h3>Passos</h3>
+            <div id="steps"></div>
         </div>
     </div>
 

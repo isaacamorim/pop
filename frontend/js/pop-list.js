@@ -1,104 +1,152 @@
-// frontend/pop_front/pop-list.html
+// frontend/pop_front/js/pop-list.js
+import { apiGet, API_BASE } from "./api.js";
 
-import { apiGet, apiPost, qs } from "./api.js";
+// helper local (não importa e não exporta)
+const qs = (sel, root = document) => root.querySelector(sel);
+
 qs("#apiBase").textContent = API_BASE;
 
+console.log("[pop-list] carregou");
+
 function fmtDate(iso) {
-    if (!iso) return "-";
-    try { return new Date(iso).toLocaleString(); }
-    catch { return iso; }
-}
-
-function normalize(v) {
-    return (v ?? "").toString().trim();
-}
-
-function buildQuery() {
-    const linkType = normalize(qs("#linkType").value);
-    const codMaquina = normalize(qs("#codMaquina").value);
-
-    const params = new URLSearchParams();
-    if (linkType) params.set("link_type", linkType);
-    if (codMaquina) params.set("cod_maquina", codMaquina);
-
-    const qsStr = params.toString();
-    return `/api/services${qsStr ? `?${qsStr}` : ""}`;
-}
-
-function render(items) {
-    const list = qs("#list");
-    list.innerHTML = "";
-
-    if (!items.length) {
-        qs("#status").innerHTML = `<div class="alert">Nenhum POP encontrado com os filtros atuais.</div>`;
-        return;
-    }
-
-    qs("#status").textContent = `${items.length} POP(s) encontrado(s).`;
-
-    for (const v of items) {
-        const el = document.createElement("div");
-        el.className = "card item";
-
-        const title = v.TEMPLATE_TITLE || v.SUMMARY || "(sem título)";
-        const codMaq = v.COD_MAQUINA || "-";
-        const codTar = v.COD_TAREFA || "-";
-
-        el.innerHTML = `
-      <div class="meta">
-        <div class="title">${escapeHtml(title)}</div>
-        <div class="small">
-          <span class="badge">VERSION_ID: <b>${v.ID}</b></span>
-          <span class="badge">VERSÃO: <b>${v.VERSION_NUM}</b></span>
-        </div>
-        <div class="small">
-          <span class="badge">COD_MAQUINA: <b>${escapeHtml(codMaq)}</b></span>
-          <span class="badge">COD_TAREFA: <b>${escapeHtml(codTar)}</b></span>
-        </div>
-        <div class="small">Criado em: ${escapeHtml(fmtDate(v.CREATED_AT))}</div>
-      </div>
-
-      <div class="actions">
-        <button class="btn primary" data-view="${v.ID}">Ver</button>
-      </div>
-    `;
-
-        list.appendChild(el);
-    }
-
-    list.querySelectorAll("button[data-view]").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const id = btn.getAttribute("data-view");
-            window.location.href = `./pop-view.html?id=${encodeURIComponent(id)}`;
-        });
-    });
+  if (!iso) return "-";
+  try { return new Date(iso).toLocaleString(); }
+  catch { return iso; }
 }
 
 function escapeHtml(s) {
-    return (s ?? "").toString()
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+  return (s ?? "").toString()
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalize(v) {
+  return (v ?? "").toString().trim();
+}
+
+function buildQuery() {
+  const status = normalize(qs("#statusFilter")?.value || "ALL");
+  const q = normalize(qs("#q")?.value || "");
+  const linkType = normalize(qs("#linkType")?.value || "");
+  const codMaquina = normalize(qs("#codMaquina")?.value || "");
+
+  const params = new URLSearchParams();
+  if (status && status !== "ALL") params.set("status", status);
+
+  // junta tudo num q só (sem complicar backend)
+  let qq = q;
+  if (linkType) qq = `${qq ? qq + " " : ""}${linkType}`.trim();
+  if (codMaquina) qq = `${qq ? qq + " " : ""}${codMaquina}`.trim();
+  if (qq) params.set("q", qq);
+
+  const qsStr = params.toString();
+  return `/api/pops${qsStr ? `?${qsStr}` : ""}`;
+}
+
+function render(items) {
+  const list = qs("#list");
+  list.innerHTML = "";
+
+  if (!items || !items.length) {
+    qs("#status").innerHTML = `<div class="alert">Nenhum POP encontrado com os filtros atuais.</div>`;
+    return;
+  }
+
+  qs("#status").textContent = `${items.length} POP(s) encontrado(s).`;
+
+  for (const p of items) {
+    const el = document.createElement("div");
+    el.className = "card item";
+
+    // sua API está retornando em lowercase também; aqui aceitamos ambos
+    const TITLE = p.title ?? p.TITLE ?? "(sem título)";
+    const CODE = p.code ?? p.CODE ?? "-";
+    const STATUS = (p.status ?? p.STATUS ?? "DRAFT").toUpperCase();
+
+    const LINK_TYPE = p.link_type ?? p.LINK_TYPE ?? "-";
+    const COD_MAQUINA = p.cod_maquina ?? p.COD_MAQUINA ?? "-";
+    const COD_TAREFA = p.cod_tarefa ?? p.COD_TAREFA ?? "-";
+    const NP_CODIGO = p.np_codigo ?? p.NP_CODIGO ?? "-";
+    const PRODUCT_CODE = p.product_code ?? p.PRODUCT_CODE ?? "-";
+
+    const TEMPLATE_ID = p.template_id ?? p.TEMPLATE_ID;
+    const VERSION_ID = p.version_id ?? p.VERSION_ID ?? "-";
+    const VERSION_NUM = p.version_num ?? p.VERSION_NUM ?? "-";
+    const CREATED_AT = p.created_at ?? p.CREATED_AT ?? null;
+
+    el.innerHTML = `
+      <div class="meta">
+        <div class="title">${escapeHtml(TITLE)}</div>
+
+        <div class="small" style="margin-top:6px;">
+          <span class="badge">CODE: <b>${escapeHtml(CODE)}</b></span>
+          <span class="badge">STATUS: <b>${escapeHtml(STATUS)}</b></span>
+        </div>
+
+        <div class="small" style="margin-top:6px;">
+          <span class="badge">TEMPLATE_ID: <b>${escapeHtml(TEMPLATE_ID)}</b></span>
+          <span class="badge">VERSION_ID: <b>${escapeHtml(VERSION_ID)}</b></span>
+          <span class="badge">VERSÃO: <b>${escapeHtml(VERSION_NUM)}</b></span>
+        </div>
+
+        <div class="small" style="margin-top:6px;">
+          <span class="badge">VÍNCULO: <b>${escapeHtml(LINK_TYPE)}</b></span>
+          <span class="badge">MAQ: <b>${escapeHtml(COD_MAQUINA)}</b></span>
+          <span class="badge">TAR: <b>${escapeHtml(COD_TAREFA)}</b></span>
+          <span class="badge">NP: <b>${escapeHtml(NP_CODIGO)}</b></span>
+          <span class="badge">PROD: <b>${escapeHtml(PRODUCT_CODE)}</b></span>
+        </div>
+
+        <div class="small" style="margin-top:6px;">
+          Criado em: ${escapeHtml(fmtDate(CREATED_AT))}
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" data-view="${escapeHtml(TEMPLATE_ID)}">Ver</button>
+      </div>
+    `;
+
+    list.appendChild(el);
+  }
+
+  list.querySelectorAll("button[data-view]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const templateId = btn.getAttribute("data-view");
+      window.location.href = `./pop-view.html?template_id=${encodeURIComponent(templateId)}`;
+    });
+  });
 }
 
 async function load() {
-    qs("#status").textContent = "Buscando POPs...";
-    const path = buildQuery();
-    try {
-        const items = await apiGet(path);
-        render(items);
-    } catch (err) {
-        qs("#status").innerHTML = `<div class="alert">Erro ao buscar: ${escapeHtml(err.message)}</div>`;
-    }
+  qs("#status").textContent = "Buscando POPs...";
+  const path = buildQuery();
+  console.log("[pop-list] GET", path);
+
+  try {
+    const items = await apiGet(path);
+    console.log("[pop-list] resposta", items);
+    render(items);
+  } catch (err) {
+    console.error("[pop-list] erro", err);
+    qs("#status").innerHTML = `<div class="alert">Erro ao buscar: ${escapeHtml(err.message)}</div>`;
+  }
 }
 
-qs("#btnBuscar").addEventListener("click", load);
-qs("#btnLimpar").addEventListener("click", () => {
-    qs("#linkType").value = "";
-    qs("#codMaquina").value = "";
-    load();
+qs("#btnBuscar")?.addEventListener("click", () => {
+  console.log("[pop-list] clicou buscar");
+  load();
+});
+
+qs("#btnLimpar")?.addEventListener("click", () => {
+  if (qs("#statusFilter")) qs("#statusFilter").value = "ALL";
+  if (qs("#q")) qs("#q").value = "";
+  if (qs("#linkType")) qs("#linkType").value = "";
+  if (qs("#codMaquina")) qs("#codMaquina").value = "";
+  load();
 });
 
 load();

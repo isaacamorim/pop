@@ -21,6 +21,7 @@ class PopVersion(db.Model):
     IPV_CREATED_BY = db.Column(db.Integer, nullable=True)
     IPV_CREATED_AT = db.Column(db.DateTime, server_default=db.func.now())
     IPV_ACTIVE = db.Column(db.Boolean, server_default=db.text("TRUE"))
+    IPV_STATUS = db.Column(db.String(20), default="DRAFT", nullable=False)
 
     # relationships
     TEMPLATE = db.relationship("PopTemplate", back_populates="VERSIONS")
@@ -70,4 +71,3 @@ class PopVersion(db.Model):
             data["ATTACHMENTS"] = [a.to_dict() for a in self.ATTACHMENTS]
             data["LINKS"] = [l.to_dict() for l in self.LINKS]
         return data
-

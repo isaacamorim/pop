@@ -62,17 +62,27 @@
                 </div>
 
                 <div id="blkNp" style="display:none; margin-top:10px;">
-                    <label>NP</label>
-                    <input id="NP_CODIGO" placeholder="Ex: 123456" />
+                    <label>NP (em produção)</label>
+                    <select id="NP_CODIGO">
+                        <option value="">Selecione...</option>
+                    </select>
+                
+                    <div class="muted" style="font-size:12px; margin-top:6px;">
+                        Mostra: NP + Produto + Descrição
+                    </div>
+                
                     <label style="margin-top:8px;">Sequência (opcional)</label>
                     <input id="SEQ_COD" placeholder="Ex: 0010" />
-                    <div class="muted" style="font-size:12px; margin-top:6px;">Use NP para geral. Use Sequência quando
-                        precisar.</div>
                 </div>
 
                 <div id="blkProduct" style="display:none; margin-top:10px;">
                     <label>Produto</label>
-                    <input id="PRODUCT_CODE" placeholder="Ex: 000123" />
+                
+                    <input id="PRODUCT_Q" placeholder="Buscar produto (código ou descrição)..." />
+                    <div id="productResults" class="card" style="display:none; margin-top:8px; padding:0;"></div>
+                
+                    <label style="margin-top:8px;">Código selecionado</label>
+                    <input id="PRODUCT_CODE" placeholder="Ex: P000123" />
                 </div>
             </section>
 

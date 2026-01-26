@@ -1,5 +1,5 @@
 // frontend/pop_front/js/api.js
-export const API_BASE = "http://localhost:8000";
+export const API_BASE = "http://127.0.0.1:8000";
 
 // helpers DOM
 export const qs = (sel, root = document) => root.querySelector(sel);
@@ -10,8 +10,12 @@ function buildNextUrl() {
 }
 
 function isLoginPage() {
-    // cobre /login.html e também qualquer variação com querystring
     return location.pathname.toLowerCase().endsWith("/login.html");
+}
+
+export function goLogin(nextUrl = location.href) {
+    const next = encodeURIComponent(nextUrl);
+    location.href = `./login.html?next=${next}`;
 }
 
 export async function apiRequest(method, path, body) {
@@ -20,28 +24,23 @@ export async function apiRequest(method, path, body) {
     const opts = {
         method,
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        credentials: "include", // ✅ OBRIGATÓRIO p/ sessão
     };
 
     if (body !== undefined) opts.body = JSON.stringify(body);
 
     const res = await fetch(url, opts);
 
-    // 401: se não estiver no login, manda pro login com ?next=
+    // 401: se não estiver no login, manda pro login
     if (res.status === 401) {
-        if (!isLoginPage()) {
-            location.href = `./login.html?next=${buildNextUrl()}`;
-        }
-        throw new Error("Não autenticado.");
+        if (!isLoginPage()) goLogin(location.href);
+        const txt401 = await res.text().catch(() => "");
+        throw new Error(txt401 || "Não autenticado.");
     }
 
     const txt = await res.text();
     let data = null;
-    try {
-        data = txt ? JSON.parse(txt) : null;
-    } catch {
-        data = txt;
-    }
+    try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
 
     if (!res.ok) {
         const msg = (data && data.error) ? data.error : `HTTP ${res.status}`;

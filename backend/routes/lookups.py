@@ -92,3 +92,76 @@ def ops():
 
     rows = db.session.execute(text(sql), params).mappings().all()
     return jsonify([dict(r) for r in rows])
+
+
+@bp_lookups.get("/nps")
+def get_nps():
+    sql = text(
+        """
+        SELECT
+            JNP_CODIGO AS COD,
+            JNP_DESCRI AS DESCR,
+            JNP_PAIPROERP AS PRODUTO
+        FROM SYSALL.J_CADNP
+        WHERE JNP_STATUS = 'D'
+        ORDER BY JNP_CODIGO
+    """
+    )
+    rows = db.session.execute(sql).mappings().all()
+
+    # debug rápido: imprime chaves do 1º row
+    if rows:
+        print("NP keys:", list(rows[0].keys()))
+
+    def pick(row, *names):
+        for n in names:
+            if n in row:
+                return row[n]
+        return None
+
+    return jsonify(
+        [
+            {
+                "PRODUTO": pick(r, "PRODUTO", "produto", "JNP_PAIPROERP", "jnp_paiproerp"),
+                "COD": pick(r, "COD", "cod", "JNP_CODIGO", "jnp_codigo"),
+                "DESCR": pick(r, "DESCR", "descr", "JNP_DESCRI", "jnp_descri"),
+            }
+            for r in rows
+        ]
+    )
+
+
+@bp_lookups.get("/products")
+def get_products():
+    q = (request.args.get("q") or "").strip().upper()
+    pm_only = (request.args.get("pm_only") or "0") == "1"
+
+    sql = """
+        SELECT
+            JRO_PROERP AS "COD",
+            JRO_DESCRI AS "DESCR",
+            JRO_STATUS AS "STATUS"
+        FROM SYSALL.J_PRODUTO
+        WHERE 1=1
+    """
+    params = {}
+
+    if q:
+        sql += " AND (UPPER(JRO_PROERP) LIKE :q OR UPPER(JRO_DESCRI) LIKE :q) "
+        params["q"] = f"%{q}%"
+
+    if pm_only:
+        sql += " AND (JRO_PROERP LIKE 'P%' OR JRO_PROERP LIKE 'M%') "
+
+    # opcional: se quiser só produtos "AT"
+    # sql += " AND JRO_STATUS = 'AT' "
+
+    sql += " ORDER BY JRO_PROERP FETCH FIRST 50 ROWS ONLY"
+
+    rows = db.session.execute(text(sql), params).mappings().all()
+    return jsonify(
+        [
+            {"COD": r["COD"], "DESCR": r.get("DESCR"), "STATUS": r.get("STATUS")}
+            for r in rows
+        ]
+    )

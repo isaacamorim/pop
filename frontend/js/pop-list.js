@@ -1,12 +1,39 @@
 // frontend/pop_front/js/pop-list.js
-import { apiGet, API_BASE } from "./api.js";
-
-// helper local (não importa e não exporta)
-const qs = (sel, root = document) => root.querySelector(sel);
+import { apiGet, apiPost, qs, API_BASE } from "./api.js";
 
 qs("#apiBase").textContent = API_BASE;
 
-console.log("[pop-list] carregou");
+function loadHello() {
+  const hello = qs("#hello");
+  const btnLogout = qs("#btnLogout");
+
+  const raw = localStorage.getItem("pop_user");
+  if (!raw) {
+    if (hello) hello.textContent = "Olá";
+    if (btnLogout) btnLogout.style.display = "none";
+    return null;
+  }
+
+  let user = null;
+  try { user = JSON.parse(raw); } catch { user = null; }
+
+  const firstName = (user?.nome || user?.usuario || "").split(" ")[0];
+
+  if (hello) hello.textContent = firstName ? `Olá, ${firstName}` : "Olá";
+  if (btnLogout) btnLogout.style.display = "inline-flex";
+
+  if (btnLogout) {
+    btnLogout.onclick = async () => {
+      try {
+        await apiPost("/api/auth/logout", {});
+      } catch { }
+      localStorage.removeItem("pop_user");
+      location.href = "./login.html?next=" + encodeURIComponent("./pop-list.html");
+    };
+  }
+
+  return user;
+}
 
 function fmtDate(iso) {
   if (!iso) return "-";
@@ -36,7 +63,6 @@ function buildQuery() {
   const params = new URLSearchParams();
   if (status && status !== "ALL") params.set("status", status);
 
-  // junta tudo num q só (sem complicar backend)
   let qq = q;
   if (linkType) qq = `${qq ? qq + " " : ""}${linkType}`.trim();
   if (codMaquina) qq = `${qq ? qq + " " : ""}${codMaquina}`.trim();
@@ -61,7 +87,6 @@ function render(items) {
     const el = document.createElement("div");
     el.className = "card item";
 
-    // sua API está retornando em lowercase também; aqui aceitamos ambos
     const TITLE = p.title ?? p.TITLE ?? "(sem título)";
     const CODE = p.code ?? p.CODE ?? "-";
     const STATUS = (p.status ?? p.STATUS ?? "DRAFT").toUpperCase();
@@ -124,29 +149,30 @@ function render(items) {
 async function load() {
   qs("#status").textContent = "Buscando POPs...";
   const path = buildQuery();
-  console.log("[pop-list] GET", path);
-
   try {
     const items = await apiGet(path);
-    console.log("[pop-list] resposta", items);
     render(items);
   } catch (err) {
-    console.error("[pop-list] erro", err);
     qs("#status").innerHTML = `<div class="alert">Erro ao buscar: ${escapeHtml(err.message)}</div>`;
   }
 }
 
-qs("#btnBuscar")?.addEventListener("click", () => {
-  console.log("[pop-list] clicou buscar");
-  load();
-});
+function wireEvents() {
+  qs("#btnBuscar")?.addEventListener("click", load);
 
-qs("#btnLimpar")?.addEventListener("click", () => {
-  if (qs("#statusFilter")) qs("#statusFilter").value = "ALL";
-  if (qs("#q")) qs("#q").value = "";
-  if (qs("#linkType")) qs("#linkType").value = "";
-  if (qs("#codMaquina")) qs("#codMaquina").value = "";
-  load();
-});
+  qs("#btnLimpar")?.addEventListener("click", () => {
+    if (qs("#statusFilter")) qs("#statusFilter").value = "ALL";
+    if (qs("#q")) qs("#q").value = "";
+    if (qs("#linkType")) qs("#linkType").value = "";
+    if (qs("#codMaquina")) qs("#codMaquina").value = "";
+    load();
+  });
+}
 
-load();
+function init() {
+  loadHello();
+  wireEvents();
+  load();
+}
+
+init();

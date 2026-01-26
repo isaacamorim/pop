@@ -49,9 +49,58 @@ body {
 
 .topbar {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
     margin-bottom: 12px;
+}
+
+.topbar .top-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.topbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.topbar-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.top-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* desktop */
+@media (min-width: 820px) {
+    .topbar {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+
+    .topbar-right {
+        align-items: flex-end;
+    }
+}
+
+/* se você estiver mostrando hello + logout */
+/* tirar depois quando tirar o olá */
+#hello {
+    font-weight: 700;
 }
 
 h1 {
@@ -155,7 +204,7 @@ select:focus {
     background: var(--primary-color);
     border-color: var(--secondary-color);
     color: #fff;
-    box-shadow: 0 10px 18px rgba(213, 32, 41, .18);
+    /*box-shadow: 0 10px 18px rgba(213, 32, 41, .18);*/
 }
 
 .btn.primary:hover {
@@ -442,4 +491,34 @@ body.auth {
     font-size: 12px;
     text-align: center;
     color: var(--muted);
+}
+
+
+
+
+
+
+
+
+
+
+@media (min-width: 820px) {
+    .topbar {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+}
+
+.topbar-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.top-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
 }

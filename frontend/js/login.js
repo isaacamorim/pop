@@ -13,6 +13,7 @@ function showMsg(text, type = "error") {
         el.classList.remove("ok");
         return;
     }
+
     el.style.display = "block";
     el.textContent = text;
     el.classList.toggle("ok", type === "ok");
@@ -21,22 +22,21 @@ function showMsg(text, type = "error") {
 function setLoading(isLoading) {
     const btn = qs("#btnLogin");
     if (!btn) return;
+
     btn.disabled = isLoading;
     btn.classList.toggle("loading", isLoading);
+
     const t = btn.querySelector(".btn-text");
     if (t) t.textContent = isLoading ? "Entrando..." : "Entrar";
 }
 
 function safeNext() {
-    // Se tiver next, usa. Senão vai pra lista.
     const next = new URLSearchParams(location.search).get("next") || "./pop-list.html";
 
-    // segurança: se vier URL completa (http...), converte pro path/arquivo do front
+    // URL completa -> pega só o arquivo final
     if (next.startsWith("http://") || next.startsWith("https://")) {
         try {
             const u = new URL(next);
-            // se o next for algo como http://127.0.0.1:5500/frontend/pop_front/pop-list.html
-            // pega só o final
             const parts = u.pathname.split("/");
             const file = parts[parts.length - 1] || "pop-list.html";
             return `./${file}`;
@@ -45,14 +45,19 @@ function safeNext() {
         }
     }
 
+    // caminho absoluto (/frontend/...) -> pega só o arquivo final
+    if (next.startsWith("/")) {
+        const parts = next.split("/");
+        const file = parts[parts.length - 1] || "pop-list.html";
+        return `./${file}`;
+    }
+
     return next;
 }
 
 async function doLogin() {
     const username = (qs("#username")?.value || "").trim();
     const password = qs("#password")?.value || "";
-
-    console.log("[login] click", { username });
 
     showMsg("");
     if (!username || !password) {
@@ -64,14 +69,14 @@ async function doLogin() {
 
     try {
         const res = await apiPost("/api/auth/login", { username, password });
-        console.log("[login] resposta", res);
+
+        // guarda só o necessário pra UI
+        localStorage.setItem("pop_user", JSON.stringify(res.user));
 
         showMsg(`Bem-vindo, ${res.user?.nome || res.user?.usuario || username}!`, "ok");
 
+        // redireciona UMA vez
         const go = safeNext();
-        console.log("[login] redirect =>", go);
-
-        // redireciona
         window.location.assign(go);
     } catch (e) {
         console.error("[login] erro", e);

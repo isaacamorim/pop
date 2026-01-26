@@ -22,10 +22,16 @@ def create_app():
     # CORS + cookie
     CORS(
         app,
-        resources={
-            r"/api/*": {"origins": ["http://127.0.0.1:5500", "http://localhost:5500"]}
-        },
         supports_credentials=True,
+        resources={
+            r"/api/*": {
+                "origins": [
+                    "http://127.0.0.1:5500",
+                    "http://localhost:5500",
+                    "http://10.42.92.78:5500", # ip da maquina
+                ]
+            }
+        },
     )
 
     # ATIVA THICK ANTES DO SQLALCHEMY

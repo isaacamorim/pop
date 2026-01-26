@@ -1,0 +1,50 @@
+<!-- frontend/pop_front/login.html -->
+<!doctype html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Login</title>
+    <link rel="stylesheet" href="./css/style.css" />
+</head>
+
+<body class="auth">
+    <div class="auth-wrap">
+
+        <div class="card auth-card">
+            <div class="auth-head">
+                <div class="brand-dot" aria-hidden="true"></div>
+                <div>
+                    <h1 class="auth-title">Entrar</h1>
+                    <div class="auth-sub">Acesso para criação/edição de POP</div>
+                </div>
+            </div>
+
+            <div class="auth-form">
+                <label for="username">Usuário</label>
+                <input id="username" autocomplete="username" placeholder="ex: isaac" />
+
+                <label for="password" style="margin-top:10px;">Senha</label>
+                <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+
+                <div id="msg" class="alert" style="display:none; margin-top:12px;"></div>
+
+                <button class="btn primary auth-btn" id="btnLogin" type="button">
+                    <span class="btn-text">Entrar</span>
+                    <span class="spinner" aria-hidden="true"></span>
+                </button>
+
+                <div class="muted" style="margin-top:10px; font-size:12px;">
+                    Dica: use seu usuário do ERP.
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-foot muted">POP • Sistema interno</div>
+    </div>
+
+    <script type="module" src="./js/login.js"></script>
+</body>
+
+</html>

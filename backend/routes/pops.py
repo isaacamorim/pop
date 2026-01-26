@@ -6,6 +6,7 @@ from models.pop_template import PopTemplate
 from models.pop_version import PopVersion
 from models.pop_link import PopLink
 from models.pop_step import PopStep
+from .auth_guard import login_required
 from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
@@ -48,6 +49,7 @@ def _require_link_fields(link_type: str, data: dict):
 
 
 @bp_pops.post("/draft")
+@login_required
 def create_draft():
     data = request.get_json(force=True) or {}
 
@@ -106,8 +108,8 @@ def create_draft():
     }), 201
 
 
-
 @bp_pops.patch("/draft/<template_id>")
+@login_required
 def update_draft(template_id: str):
     data = request.get_json(force=True) or {}
 
@@ -181,6 +183,7 @@ def update_draft(template_id: str):
 
 
 @bp_pops.post("/<template_id>/publish")
+@login_required
 def publish(template_id: str):
     t = PopTemplate.query.get_or_404(template_id)
 

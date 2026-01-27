@@ -94,37 +94,45 @@ def ops():
     return jsonify([dict(r) for r in rows])
 
 
+from flask import request, jsonify
+from sqlalchemy import text
+
+
 @bp_lookups.get("/nps")
 def get_nps():
-    sql = text(
-        """
+    q = (request.args.get("q") or "").strip().upper()
+    limit = int(request.args.get("limit") or 30)
+
+    sql = """
         SELECT
-            JNP_CODIGO AS COD,
-            JNP_DESCRI AS DESCR,
+            JNP_CODIGO    AS COD,
+            JNP_DESCRI    AS DESCR,
             JNP_PAIPROERP AS PRODUTO
         FROM SYSALL.J_CADNP
         WHERE JNP_STATUS = 'D'
-        ORDER BY JNP_CODIGO
     """
-    )
-    rows = db.session.execute(sql).mappings().all()
+    params = {}
 
-    # debug rápido: imprime chaves do 1º row
-    if rows:
-        print("NP keys:", list(rows[0].keys()))
+    if q:
+        sql += """
+            AND (
+                UPPER(JNP_CODIGO) LIKE :q
+                OR UPPER(JNP_DESCRI) LIKE :q
+                OR UPPER(JNP_PAIPROERP) LIKE :q
+            )
+        """
+        params["q"] = f"%{q}%"
 
-    def pick(row, *names):
-        for n in names:
-            if n in row:
-                return row[n]
-        return None
+    sql += f" ORDER BY JNP_CODIGO FETCH FIRST {limit} ROWS ONLY"
+
+    rows = db.session.execute(text(sql), params).all()
 
     return jsonify(
         [
             {
-                "PRODUTO": pick(r, "PRODUTO", "produto", "JNP_PAIPROERP", "jnp_paiproerp"),
-                "COD": pick(r, "COD", "cod", "JNP_CODIGO", "jnp_codigo"),
-                "DESCR": pick(r, "DESCR", "descr", "JNP_DESCRI", "jnp_descri"),
+                "COD": r[0],
+                "DESCR": r[1],
+                "PRODUTO": r[2],
             }
             for r in rows
         ]
@@ -135,12 +143,13 @@ def get_nps():
 def get_products():
     q = (request.args.get("q") or "").strip().upper()
     pm_only = (request.args.get("pm_only") or "0") == "1"
+    limit = int(request.args.get("limit") or 30)
 
     sql = """
         SELECT
-            JRO_PROERP AS "COD",
-            JRO_DESCRI AS "DESCR",
-            JRO_STATUS AS "STATUS"
+            JRO_PROERP AS COD,
+            JRO_DESCRI AS DESCR,
+            JRO_STATUS AS STATUS
         FROM SYSALL.J_PRODUTO
         WHERE 1=1
     """
@@ -153,15 +162,17 @@ def get_products():
     if pm_only:
         sql += " AND (JRO_PROERP LIKE 'P%' OR JRO_PROERP LIKE 'M%') "
 
-    # opcional: se quiser só produtos "AT"
-    # sql += " AND JRO_STATUS = 'AT' "
+    sql += f" ORDER BY JRO_PROERP FETCH FIRST {limit} ROWS ONLY"
 
-    sql += " ORDER BY JRO_PROERP FETCH FIRST 50 ROWS ONLY"
+    rows = db.session.execute(text(sql), params).all()
 
-    rows = db.session.execute(text(sql), params).mappings().all()
     return jsonify(
         [
-            {"COD": r["COD"], "DESCR": r.get("DESCR"), "STATUS": r.get("STATUS")}
+            {
+                "COD": r[0],
+                "DESCR": r[1],
+                "STATUS": r[2],
+            }
             for r in rows
         ]
     )

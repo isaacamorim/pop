@@ -1,5 +1,5 @@
 // frontend/pop_front/js/api.js
-export const API_BASE = "http://127.0.0.1:8000";
+export const API_BASE = "http://10.42.92.78:8000";
 
 // helpers DOM
 export const qs = (sel, root = document) => root.querySelector(sel);

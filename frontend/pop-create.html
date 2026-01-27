@@ -63,26 +63,51 @@
 
                 <div id="blkNp" style="display:none; margin-top:10px;">
                     <label>NP (em produção)</label>
-                    <select id="NP_CODIGO">
-                        <option value="">Selecione...</option>
-                    </select>
                 
-                    <div class="muted" style="font-size:12px; margin-top:6px;">
-                        Mostra: NP + Produto + Descrição
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input id="NP_Q" placeholder="Buscar por código, descrição ou produto..." autocomplete="off" style="flex:1;" />
+                
+                        <button id="btnNpListar" class="btn" type="button" title="Carregar últimas/primeiras NPs">
+                            Listar
+                        </button>
+                
+                        <button id="btnNpLimpar" class="btn" type="button">
+                            Limpar
+                        </button>
                     </div>
                 
-                    <label style="margin-top:8px;">Sequência (opcional)</label>
+                    <div class="muted" style="font-size:12px; margin-top:6px;">
+                        Dica: digite 2+ caracteres para filtrar. Ou clique em <b>Listar</b> para ver opções sem filtro.
+                    </div>
+                
+                    <div id="npResults"
+                        style="display:none; border:1px solid var(--border); border-radius:8px; margin-top:8px; overflow:hidden; max-height:260px; overflow-y:auto;">
+                    </div>
+                
+                    <label style="margin-top:10px;">NP selecionada</label>
+                    <input id="NP_CODIGO" placeholder="Selecione na lista acima" readonly />
+                
+                    <label style="margin-top:10px;">Produto (da NP)</label>
+                    <input id="NP_PRODUTO" placeholder="Auto" readonly />
+                
+                    <label style="margin-top:10px;">Sequência (opcional)</label>
                     <input id="SEQ_COD" placeholder="Ex: 0010" />
+                
+                    <div class="muted" style="font-size:12px; margin-top:6px;">
+                        Ao selecionar uma NP, o produto pai é preenchido automaticamente.
+                    </div>
                 </div>
 
                 <div id="blkProduct" style="display:none; margin-top:10px;">
-                    <label>Produto</label>
+                    <label>Buscar Produto</label>
+                    <input id="PRODUCT_Q" placeholder="Digite código ou descrição..." autocomplete="off" />
                 
-                    <input id="PRODUCT_Q" placeholder="Buscar produto (código ou descrição)..." />
-                    <div id="productResults" class="card" style="display:none; margin-top:8px; padding:0;"></div>
+                    <div id="productResults"
+                        style="display:none; border:1px solid var(--border); border-radius:8px; margin-top:6px; overflow:hidden;">
+                    </div>
                 
-                    <label style="margin-top:8px;">Código selecionado</label>
-                    <input id="PRODUCT_CODE" placeholder="Ex: P000123" />
+                    <label style="margin-top:10px;">Produto selecionado</label>
+                    <input id="PRODUCT_CODE" placeholder="Selecione acima" readonly />
                 </div>
             </section>
 

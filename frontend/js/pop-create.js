@@ -9,7 +9,7 @@ async function main() {
     const user = await requireAuth();
     if (!user) {
         console.warn("[pop-create] não autenticado -> redirecionado pelo guard");
-        return; // ✅ aqui PODE (está dentro de função)
+        return;
     }
 
     console.log("[pop-create] Usuário autenticado:", user.nome || user.usuario || user.id);
@@ -88,31 +88,31 @@ async function main() {
                 return "Selecione a tarefa.";
             }
 
-            if (lt === "NP" && !state.form.NP_CODIGO) {
-                return "Selecione a NP.";
+            if (lt === "NP") {
+                if (!state.form.NP_CODIGO) {
+                    return "Selecione a NP (busque e clique).";
+                }
             }
 
-            if (lt === "PECA" && !state.form.PRODUCT_CODE) {
-                return "Informe o código do produto.";
+            if (lt === "PECA") {
+                if (!state.form.PRODUCT_CODE) {
+                    return "Selecione o produto (busque e clique).";
+                }
             }
 
             if (lt === "PECA_OP") {
                 if (!state.form.PRODUCT_CODE) {
-                    return "Informe o código do produto.";
+                    return "Selecione o produto (busque e clique).";
                 }
-
-                // regra P/M
                 if (!/^[PM]/i.test(state.form.PRODUCT_CODE || "")) {
                     return "Para Peça + Operação, o produto deve começar com P ou M.";
                 }
-
-                // precisa NP ou SEQ
                 if (!state.form.NP_CODIGO && !state.form.SEQ_COD) {
                     return "Informe NP ou Sequência.";
                 }
             }
 
-            // SERVICO: não exige nada na etapa 2
+            // SERVICO: não exige nada aqui (vai direto pro Step 3)
         }
 
         if (n === 3) {
@@ -240,24 +240,9 @@ async function main() {
         }
     }
 
-    async function loadNps() {
-        const sel = document.getElementById("NP_CODIGO");
-        if (!sel) return;
-
-        sel.innerHTML = `<option value="">Carregando...</option>`;
-        const rows = await apiGet("/api/lookups/nps");
-
-        sel.innerHTML =
-            `<option value="">Selecione...</option>` +
-            rows.map(r => {
-                const cod = r.COD ?? "";
-                const descr = r.DESCR ?? "";
-                const prod = r.PRODUTO ?? "";
-                const label = `${cod}${prod ? " • " + prod : ""}${descr ? " — " + descr : ""}`;
-                return `<option value="${cod}" data-produto="${prod}">${label}</option>`;
-            }).join("");
-    }
-
+    // ========================================
+    // PRODUCT SEARCH
+    // ========================================
     let productTimer = null;
 
     async function searchProducts() {
@@ -278,22 +263,24 @@ async function main() {
 
         if (!rows.length) {
             box.style.display = "block";
-            box.innerHTML = `<div class="muted">Nenhum produto encontrado.</div>`;
+            box.innerHTML = `<div class="muted" style="padding:8px;">Nenhum produto encontrado.</div>`;
             return;
         }
 
         box.style.display = "block";
         box.innerHTML = rows.map(r => `
             <div class="item" style="padding:8px; border-bottom:1px solid var(--border); cursor:pointer;" data-cod="${r.COD}">
-            <div class="meta">
-                <div class="title">${r.COD} <span class="muted" style="font-weight:500;">(${r.STATUS})</span></div>
-                <div class="small">${r.DESCR || ""}</div>
-            </div>
+                <div class="meta">
+                    <div class="title">${r.COD} <span class="muted" style="font-weight:500;">(${r.STATUS})</span></div>
+                    <div class="small">${r.DESCR || ""}</div>
+                </div>
             </div>
         `).join("");
 
         box.querySelectorAll("[data-cod]").forEach(el => {
-            el.onclick = () => {
+            el.addEventListener("click", (e) => {
+                e.stopPropagation(); // 🔥 ESSENCIAL
+
                 const cod = el.getAttribute("data-cod");
                 state.form.PRODUCT_CODE = cod;
 
@@ -303,7 +290,7 @@ async function main() {
                 box.style.display = "none";
                 box.innerHTML = "";
                 toast("Produto selecionado ✅");
-            };
+            });
         });
     }
 
@@ -315,6 +302,140 @@ async function main() {
             clearTimeout(productTimer);
             productTimer = setTimeout(() => searchProducts().catch(e => toast(e.message, true)), 250);
         });
+    }
+
+    // ========================================
+    // NP SEARCH
+    // ========================================
+    let npTimer = null;
+
+    async function searchNps(query = "") {
+        // ✅ AJUSTE 3: não buscar NP se não for NP/PECA_OP
+        const lt = (state.form.LINK_TYPE || "").toUpperCase();
+        if (lt !== "NP" && lt !== "PECA_OP") return;
+
+        const box = document.getElementById("npResults");
+        if (!box) return;
+
+        try {
+            const q = query.trim();
+            const url = q
+                ? `/api/lookups/nps?q=${encodeURIComponent(q)}&limit=30`
+                : `/api/lookups/nps?limit=30`;
+
+            const rows = await apiGet(url);
+
+            if (!rows.length) {
+                box.style.display = "block";
+                box.innerHTML = `<div class="muted" style="padding:8px;">Nenhuma NP encontrada.</div>`;
+                return;
+            }
+
+            box.style.display = "block";
+            box.innerHTML = rows.map(r => {
+                const cod = r.COD || "";
+                const descr = r.DESCR || "";
+                const prod = r.PRODUTO || "";
+                const label = `${cod}${prod ? " • " + prod : ""}${descr ? " — " + descr : ""}`;
+
+                return `
+                    <div class="item" data-cod="${cod}" data-prod="${prod}"
+                         style="padding:8px; border-bottom:1px solid var(--border); cursor:pointer;">
+                        <div class="title">${label}</div>
+                    </div>
+                `;
+            }).join("");
+
+            // Adiciona evento de clique em cada item
+            box.querySelectorAll("[data-cod]").forEach(el => {
+                el.addEventListener("click", (e) => {
+                    e.stopPropagation(); // 🔥 ESSENCIAL
+
+                    const cod = el.getAttribute("data-cod") || "";
+                    const prod = el.getAttribute("data-prod") || "";
+
+                    state.form.NP_CODIGO = cod;
+
+                    const inpCod = document.getElementById("NP_CODIGO");
+                    if (inpCod) inpCod.value = cod;
+
+                    const inpProd = document.getElementById("NP_PRODUTO");
+                    if (inpProd) inpProd.value = prod;
+
+                    if (state.form.LINK_TYPE === "PECA_OP" && prod) {
+                        state.form.PRODUCT_CODE = prod;
+                        const inpProduct = document.getElementById("PRODUCT_CODE");
+                        if (inpProduct) inpProduct.value = prod;
+                    }
+
+                    box.style.display = "none";
+                    box.innerHTML = "";
+                    toast("NP selecionada ✅");
+                });
+            });
+
+        } catch (err) {
+            toast(err.message, true);
+        }
+    }
+
+    function wireNpSearch() {
+        const inp = document.getElementById("NP_Q");
+        const btnListar = document.getElementById("btnNpListar");
+        const btnLimpar = document.getElementById("btnNpLimpar");
+        const box = document.getElementById("npResults");
+
+        if (!inp) return;
+
+        // Debounce no input (busca após 250ms de pausa)
+        inp.addEventListener("input", () => {
+            clearTimeout(npTimer);
+            const q = inp.value.trim();
+
+            if (q.length < 2) {
+                if (box) {
+                    box.style.display = "none";
+                    box.innerHTML = "";
+                }
+                return;
+            }
+
+            npTimer = setTimeout(() => {
+                searchNps(q).catch(e => toast(e.message, true));
+            }, 250);
+        });
+
+        // Botão "Listar" (sem filtro)
+        if (btnListar) {
+            btnListar.onclick = () => {
+                searchNps("").catch(e => toast(e.message, true));
+            };
+        }
+
+        // Botão "Limpar"
+        if (btnLimpar) {
+            btnLimpar.onclick = () => {
+                inp.value = "";
+                state.form.NP_CODIGO = "";
+                state.form.SEQ_COD = "";
+
+                const inpCod = document.getElementById("NP_CODIGO");
+                if (inpCod) inpCod.value = "";
+
+                const inpProd = document.getElementById("NP_PRODUTO");
+                if (inpProd) inpProd.value = "";
+
+                const inpSeq = document.getElementById("SEQ_COD");
+                if (inpSeq) inpSeq.value = "";
+
+                if (box) {
+                    box.style.display = "none";
+                    box.innerHTML = "";
+                }
+
+                toast("Campos de NP limpos");
+            };
+        }
     }
 
     // ========================================
@@ -366,11 +487,24 @@ async function main() {
                         Exigir foto
                     </label>
 
-                    <label style="cursor:pointer;">
-                        <input type="checkbox" data-k="REQUIRES_SIGNATURE" data-i="${idx}" ${s.REQUIRES_SIGNATURE ? "checked" : ""}/>
-                        Exigir assinatura
-                    </label>
+                <div style="margin-top:10px;">
+                    <label>Foto do passo</label>
+
+                    <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        data-k="IMAGE"
+                        data-i="${idx}"
+                    />
+
+                    ${s.IMAGE ? `
+                        <div style="margin-top:6px;">
+                        <img src="${s.IMAGE}" style="max-width:100%; border-radius:6px;" />
+                        </div>
+                    ` : ""}
                 </div>
+
             `;
 
             wrap.appendChild(div);
@@ -381,6 +515,18 @@ async function main() {
             const handler = (e) => {
                 const i = Number(e.target.dataset.i);
                 const k = e.target.dataset.k;
+
+                if (e.target.type === "file") {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        state.form.STEPS[i].IMAGE = reader.result; // base64
+                        renderSteps(); // 🔥 re-render para mostrar preview
+                    };
+                    reader.readAsDataURL(file);
+                }
 
                 if (e.target.type === "checkbox") {
                     state.form.STEPS[i][k] = e.target.checked;
@@ -475,11 +621,57 @@ async function main() {
                     if (titleEl) titleEl.value = state.form.TITLE;
                 }
 
+                // ✅ LIMPA NP se mudar pra outro tipo que não usa NP
+                const lt = state.form.LINK_TYPE;
+                if (lt !== "NP" && lt !== "PECA_OP") {
+                    state.form.NP_CODIGO = "";
+                    state.form.SEQ_COD = "";
+
+                    const q = byId("NP_Q");
+                    if (q) q.value = "";
+
+                    const c = byId("NP_CODIGO");
+                    if (c) c.value = "";
+
+                    const p = byId("NP_PRODUTO");
+                    if (p) p.value = "";
+
+                    const box = byId("npResults");
+                    if (box) {
+                        box.style.display = "none";
+                        box.innerHTML = "";
+                    }
+                }
+
+                // ✅ LIMPA PRODUTO se mudar pra outro tipo que não usa produto
+                if (!["PECA", "PECA_OP"].includes(lt)) {
+                    state.form.PRODUCT_CODE = "";
+
+                    const pq = byId("PRODUCT_Q");
+                    if (pq) pq.value = "";
+
+                    const pc = byId("PRODUCT_CODE");
+                    if (pc) pc.value = "";
+
+                    const pr = byId("productResults");
+                    if (pr) {
+                        pr.style.display = "none";
+                        pr.innerHTML = "";
+                    }
+                }
+
+                // ✅ AJUSTE 2: se entrou em PECA_OP, força escolher produto válido (evita ficar com produto antigo)
+                if (lt === "PECA_OP") {
+                    state.form.PRODUCT_CODE = "";
+                    const pc = byId("PRODUCT_CODE");
+                    if (pc) pc.value = "";
+                }
+
                 // Load lookups
                 try {
                     if (state.form.LINK_TYPE === "MAQUINA") await loadMachines();
                     if (state.form.LINK_TYPE === "TAREFA") await loadTasks();
-                    if (state.form.LINK_TYPE === "NP" || state.form.LINK_TYPE === "PECA_OP") await loadNps();
+                    // ✅ NÃO chama loadNps() mais (busca é on-demand agora)
                 } catch (err) {
                     toast(`Erro ao carregar dados: ${err.message}`, true);
                 }
@@ -502,23 +694,6 @@ async function main() {
                 console.log("[wizard] COD_TAREFA:", state.form.COD_TAREFA);
             });
         }
-
-        const np = byId("NP_CODIGO");
-        if (np) {
-            np.addEventListener("change", (e) => {
-                const cod = (e.target.value || "").trim();
-                state.form.NP_CODIGO = cod;
-
-                // pega o produto da option selecionada e salva também (opcional, mas útil)
-                const opt = e.target.selectedOptions?.[0];
-                const prod = opt?.getAttribute("data-produto") || "";
-                state.form.NP_PRODUTO = prod;
-                if (prod) state.form.PRODUCT_CODE = prod;
-
-                console.log("[wizard] NP_CODIGO:", state.form.NP_CODIGO, "PROD:", state.form.PRODUCT_CODE);
-            });
-        }
-
 
         const seq = byId("SEQ_COD");
         if (seq) {
@@ -576,7 +751,6 @@ async function main() {
         const btnNext = byId("btnNext");
         if (btnNext) {
             btnNext.addEventListener("click", async () => {
-                // dentro do btnNext click
                 const err = validateStep(state.step);
                 if (err) return toast(err, true);
 
@@ -637,10 +811,41 @@ async function main() {
         console.log("[pop-create] Inicializando wizard...");
 
         bindInputs();
+        wireNpSearch();
         wireProductSearch();
         setLinkBlocksVisibility();
         showStep(1);
         renderSteps();
+
+        // ✅ AJUSTE 4: fechar dropdown ao clicar fora (UX profissional)
+        document.addEventListener("click", (e) => {
+            const npBox = document.getElementById("npResults");
+            const npQ = document.getElementById("NP_Q");
+            const npBtnListar = document.getElementById("btnNpListar");
+            const npBtnLimpar = document.getElementById("btnNpLimpar");
+
+            if (npBox && npBox.style.display !== "none") {
+                const clickedInside = npBox.contains(e.target) ||
+                    npQ?.contains(e.target) ||
+                    npBtnListar?.contains(e.target) ||
+                    npBtnLimpar?.contains(e.target);
+                if (!clickedInside) {
+                    npBox.style.display = "none";
+                    npBox.innerHTML = "";
+                }
+            }
+
+            const prBox = document.getElementById("productResults");
+            const prQ = document.getElementById("PRODUCT_Q");
+
+            if (prBox && prBox.style.display !== "none") {
+                const clickedInside = prBox.contains(e.target) || prQ?.contains(e.target);
+                if (!clickedInside) {
+                    prBox.style.display = "none";
+                    prBox.innerHTML = "";
+                }
+            }
+        });
 
         console.log("[pop-create] Wizard pronto! ✅");
     }

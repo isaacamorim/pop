@@ -119,6 +119,14 @@ async function main() {
             if (!state.form.TITLE || state.form.TITLE.trim().length < 3) {
                 return "Preencha um título válido (mínimo 3 caracteres).";
             }
+
+            // ✅ Validação de fotos obrigatórias
+            for (let i = 0; i < state.form.STEPS.length; i++) {
+                const s = state.form.STEPS[i];
+                if (s.REQUIRES_PHOTO && !s.IMAGE) {
+                    return `O Passo ${i + 1} exige foto.`;
+                }
+            }
         }
 
         return null;
@@ -310,7 +318,7 @@ async function main() {
     let npTimer = null;
 
     async function searchNps(query = "") {
-        // ✅ AJUSTE 3: não buscar NP se não for NP/PECA_OP
+        // ✅ não buscar NP se não for NP/PECA_OP
         const lt = (state.form.LINK_TYPE || "").toUpperCase();
         if (lt !== "NP" && lt !== "PECA_OP") return;
 
@@ -487,24 +495,33 @@ async function main() {
                         Exigir foto
                     </label>
 
-                <div style="margin-top:10px;">
-                    <label>Foto do passo</label>
+                    <label style="cursor:pointer;">
+                        <input type="checkbox" data-k="REQUIRES_SIGNATURE" data-i="${idx}" ${s.REQUIRES_SIGNATURE ? "checked" : ""}/>
+                        Exigir assinatura
+                    </label>
+                </div>
 
+                <div style="margin-top:10px;">
+                    <label>📷 Tire uma foto deste passo</label>
                     <input
                         type="file"
                         accept="image/*"
                         capture="environment"
                         data-k="IMAGE"
                         data-i="${idx}"
+                        style="width:100%; margin-top:6px;"
                     />
 
                     ${s.IMAGE ? `
-                        <div style="margin-top:6px;">
-                        <img src="${s.IMAGE}" style="max-width:100%; border-radius:6px;" />
+                        <div style="margin-top:8px; position:relative;">
+                            <img src="${s.IMAGE}" style="max-width:100%; border-radius:6px; border:1px solid #ddd;" />
+                            <button type="button" class="btn-remove-img" data-i="${idx}" 
+                                    style="position:absolute; top:8px; right:8px; background:rgba(220,38,38,0.9); color:white; border:none; padding:6px 10px; cursor:pointer; border-radius:4px; font-size:12px;">
+                                Remover foto
+                            </button>
                         </div>
                     ` : ""}
                 </div>
-
             `;
 
             wrap.appendChild(div);
@@ -520,12 +537,21 @@ async function main() {
                     const file = e.target.files[0];
                     if (!file) return;
 
+                    // ✅ Validação de tamanho (máx 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        toast("Imagem muito grande. Máximo 5MB.", true);
+                        e.target.value = "";
+                        return;
+                    }
+
                     const reader = new FileReader();
                     reader.onload = () => {
                         state.form.STEPS[i].IMAGE = reader.result; // base64
                         renderSteps(); // 🔥 re-render para mostrar preview
+                        toast("Foto adicionada ✅");
                     };
                     reader.readAsDataURL(file);
+                    return;
                 }
 
                 if (e.target.type === "checkbox") {
@@ -547,6 +573,18 @@ async function main() {
                     state.form.STEPS.splice(i, 1);
                     renderSteps();
                     toast("Passo removido");
+                }
+            });
+        });
+
+        // ✅ Bind botão remover foto
+        wrap.querySelectorAll(".btn-remove-img").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const i = Number(btn.dataset.i);
+                if (confirm("Remover foto deste passo?")) {
+                    state.form.STEPS[i].IMAGE = null;
+                    renderSteps();
+                    toast("Foto removida");
                 }
             });
         });
@@ -660,7 +698,7 @@ async function main() {
                     }
                 }
 
-                // ✅ AJUSTE 2: se entrou em PECA_OP, força escolher produto válido (evita ficar com produto antigo)
+                // ✅ se entrou em PECA_OP, força escolher produto válido
                 if (lt === "PECA_OP") {
                     state.form.PRODUCT_CODE = "";
                     const pc = byId("PRODUCT_CODE");
@@ -671,7 +709,6 @@ async function main() {
                 try {
                     if (state.form.LINK_TYPE === "MAQUINA") await loadMachines();
                     if (state.form.LINK_TYPE === "TAREFA") await loadTasks();
-                    // ✅ NÃO chama loadNps() mais (busca é on-demand agora)
                 } catch (err) {
                     toast(`Erro ao carregar dados: ${err.message}`, true);
                 }
@@ -732,6 +769,7 @@ async function main() {
                     INSTRUCTION: "",
                     REQUIRES_PHOTO: false,
                     REQUIRES_SIGNATURE: false,
+                    IMAGE: null,
                 });
                 renderSteps();
                 toast("Passo adicionado");
@@ -817,7 +855,7 @@ async function main() {
         showStep(1);
         renderSteps();
 
-        // ✅ AJUSTE 4: fechar dropdown ao clicar fora (UX profissional)
+        // ✅ fechar dropdown ao clicar fora (UX profissional)
         document.addEventListener("click", (e) => {
             const npBox = document.getElementById("npResults");
             const npQ = document.getElementById("NP_Q");

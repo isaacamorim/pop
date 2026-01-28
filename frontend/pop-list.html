@@ -33,18 +33,14 @@
         <div class="card">
             <div class="row cols-3">
                 <div>
-                    <label for="linkType">Tipo de vínculo (LINK_TYPE)</label>
+                    <label for="linkType">Mostrar apenas POPs de</label>
                     <select id="linkType">
-                        <option value="">(todos)</option>
-                        <option value="SERVICO">SERVICO</option>
-                        <option value="MAQUINA">MAQUINA</option>
-                        <option value="TAREFA">TAREFA</option>
+                        <option value="">Todos os tipos</option>
+                        <option value="MAQUINA">Máquinas</option>
+                        <option value="PECA">Produtos</option>
+                        <option value="NP">NP</option>
+                        <option value="SERVICO">Serviços</option>
                     </select>
-                </div>
-
-                <div>
-                    <label for="codMaquina">Código da Máquina (opcional)</label>
-                    <input id="codMaquina" placeholder="Ex: MAQ01" />
                 </div>
 
                 <div style="display:flex; gap:10px; align-items:flex-end;">
@@ -63,9 +59,8 @@
                 
                 <div>
                     <label for="q">Busca</label>
-                    <input id="q" placeholder="Título, código, máquina, tarefa..." />
+                    <input id="q" placeholder="Digite qualquer termo relacionado ao POP..." />
                 </div>
-
 
             </div>
 

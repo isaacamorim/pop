@@ -58,18 +58,73 @@ function buildQuery() {
   const status = normalize(qs("#statusFilter")?.value || "ALL");
   const q = normalize(qs("#q")?.value || "");
   const linkType = normalize(qs("#linkType")?.value || "");
-  const codMaquina = normalize(qs("#codMaquina")?.value || "");
 
   const params = new URLSearchParams();
   if (status && status !== "ALL") params.set("status", status);
 
   let qq = q;
-  if (linkType) qq = `${qq ? qq + " " : ""}${linkType}`.trim();
-  if (codMaquina) qq = `${qq ? qq + " " : ""}${codMaquina}`.trim();
-  if (qq) params.set("q", qq);
+  if (q) params.set("q", q);
+  if (linkType) params.set("link_type", linkType);
 
   const qsStr = params.toString();
   return `/api/pops${qsStr ? `?${qsStr}` : ""}`;
+}
+
+function renderLinkSummary(LINK_TYPE, COD_MAQUINA, COD_TAREFA, NP_CODIGO, SEQ_COD, PRODUCT_CODE) {
+  if (LINK_TYPE === "MAQUINA") return `Máquina ${COD_MAQUINA}`;
+  if (LINK_TYPE === "TAREFA") return `Tarefa ${COD_TAREFA}`;
+  if (LINK_TYPE === "NP") return `NP ${NP_CODIGO}`;
+  if (LINK_TYPE === "PECA") return `Produto ${PRODUCT_CODE}`;
+  if (LINK_TYPE === "PECA_OP") {
+    const parts = [`Produto ${PRODUCT_CODE}`];
+    if (NP_CODIGO && NP_CODIGO !== "-") parts.push(`NP ${NP_CODIGO}`);
+    if (SEQ_COD && SEQ_COD !== "-") parts.push(`Seq ${SEQ_COD}`);
+    return parts.join(" • ");
+  }
+  return "Procedimento geral";
+}
+
+function getLinkHighlight(LINK_TYPE, COD_MAQUINA, COD_TAREFA, NP_CODIGO, PRODUCT_CODE) {
+  if (LINK_TYPE === "MAQUINA") {
+    return { label: "MÁQUINA", code: COD_MAQUINA };
+  }
+  if (LINK_TYPE === "TAREFA") {
+    return { label: "TAREFA", code: COD_TAREFA };
+  }
+  if (LINK_TYPE === "NP") {
+    return { label: "NP", code: NP_CODIGO };
+  }
+  if (LINK_TYPE === "PECA" || LINK_TYPE === "PECA_OP") {
+    return { label: "PRODUTO", code: PRODUCT_CODE };
+  }
+  return { label: "SERVIÇO", code: "GERAL" };
+}
+
+function renderActiveFilters() {
+  const status = normalize(qs("#statusFilter")?.value || "ALL");
+  const q = normalize(qs("#q")?.value || "");
+  const linkType = normalize(qs("#linkType")?.value || "");
+  const codMaquina = normalize(qs("#codMaquina")?.value || "");
+
+  const parts = [];
+
+  if (status && status !== "ALL") {
+    parts.push(`Status: <b>${escapeHtml(status)}</b>`);
+  }
+
+  if (linkType) {
+    parts.push(`Tipo: <b>${escapeHtml(linkType)}</b>`);
+  }
+
+  if (q) {
+    parts.push(`Texto: <b>${escapeHtml(q)}</b>`);
+  }
+
+  if (!parts.length) {
+    return "Mostrando todos os POPs.";
+  }
+
+  return `Filtrando por: ${parts.join(" • ")}`;
 }
 
 function render(items) {
@@ -80,8 +135,6 @@ function render(items) {
     qs("#status").innerHTML = `<div class="alert">Nenhum POP encontrado com os filtros atuais.</div>`;
     return;
   }
-
-  qs("#status").textContent = `${items.length} POP(s) encontrado(s).`;
 
   for (const p of items) {
     const el = document.createElement("div");
@@ -101,32 +154,35 @@ function render(items) {
     const VERSION_ID = p.version_id ?? p.VERSION_ID ?? "-";
     const VERSION_NUM = p.version_num ?? p.VERSION_NUM ?? "-";
     const CREATED_AT = p.created_at ?? p.CREATED_AT ?? null;
+    const linkInfo = getLinkHighlight(
+      LINK_TYPE,
+      COD_MAQUINA,
+      COD_TAREFA,
+      NP_CODIGO,
+      PRODUCT_CODE
+    );
 
     el.innerHTML = `
       <div class="meta">
-        <div class="title">${escapeHtml(TITLE)}</div>
 
-        <div class="small" style="margin-top:6px;">
-          <span class="badge">CODE: <b>${escapeHtml(CODE)}</b></span>
-          <span class="badge">STATUS: <b>${escapeHtml(STATUS)}</b></span>
+        <div class="badge" style="margin-bottom:6px;">
+          ${escapeHtml(linkInfo.label)}
+        </div>
+
+        <div style="font-size:1.2rem; font-weight:800; margin-bottom:4px;">
+          ${escapeHtml(linkInfo.code)}
+        </div>
+
+        <div class="title">
+          ${escapeHtml(TITLE)}
         </div>
 
         <div class="small" style="margin-top:6px;">
-          <span class="badge">TEMPLATE_ID: <b>${escapeHtml(TEMPLATE_ID)}</b></span>
-          <span class="badge">VERSION_ID: <b>${escapeHtml(VERSION_ID)}</b></span>
-          <span class="badge">VERSÃO: <b>${escapeHtml(VERSION_NUM)}</b></span>
-        </div>
-
-        <div class="small" style="margin-top:6px;">
-          <span class="badge">VÍNCULO: <b>${escapeHtml(LINK_TYPE)}</b></span>
-          <span class="badge">MAQ: <b>${escapeHtml(COD_MAQUINA)}</b></span>
-          <span class="badge">TAR: <b>${escapeHtml(COD_TAREFA)}</b></span>
-          <span class="badge">NP: <b>${escapeHtml(NP_CODIGO)}</b></span>
-          <span class="badge">PROD: <b>${escapeHtml(PRODUCT_CODE)}</b></span>
-        </div>
-
-        <div class="small" style="margin-top:6px;">
-          Criado em: ${escapeHtml(fmtDate(CREATED_AT))}
+          ${escapeHtml(CODE)} • 
+          <b style="color:${STATUS === "PUBLISHED" ? "var(--ok)" : "var(--warn)"}">
+            ${escapeHtml(STATUS)}
+          </b> • 
+          v${escapeHtml(VERSION_NUM)}
         </div>
       </div>
 
@@ -147,18 +203,33 @@ function render(items) {
 }
 
 async function load() {
-  qs("#status").textContent = "Buscando POPs...";
+  const statusEl = qs("#status");
+  statusEl.innerHTML = renderActiveFilters();
+
   const path = buildQuery();
   try {
     const items = await apiGet(path);
     render(items);
+
+    statusEl.innerHTML += `
+      <div class="muted" style="margin-top:4px;">
+        ${items.length} POP(s) encontrado(s).
+      </div>
+    `;
   } catch (err) {
-    qs("#status").innerHTML = `<div class="alert">Erro ao buscar: ${escapeHtml(err.message)}</div>`;
+    statusEl.innerHTML = `<div class="alert">Erro ao buscar: ${escapeHtml(err.message)}</div>`;
   }
 }
 
 function wireEvents() {
   qs("#btnBuscar")?.addEventListener("click", load);
+
+  qs("#q")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      load();
+    }
+  });
 
   qs("#btnLimpar")?.addEventListener("click", () => {
     if (qs("#statusFilter")) qs("#statusFilter").value = "ALL";

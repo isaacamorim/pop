@@ -236,6 +236,7 @@ def publish(template_id: str):
 def list_pops():
     status = (request.args.get("status") or "ALL").upper()
     q = (request.args.get("q") or "").strip()
+    link_type = (request.args.get("link_type") or "").upper().strip()
 
     sql = """
         SELECT
@@ -272,6 +273,10 @@ def list_pops():
     if status != "ALL":
         sql += " AND UPPER(NVL(t.IPT_STATUS,'DRAFT')) = :status "
         params["status"] = status
+        
+    if link_type:
+        sql += " AND UPPER(l.IPL_LINK_TYPE) = :link_type "
+        params["link_type"] = link_type
 
     if q:
         sql += """

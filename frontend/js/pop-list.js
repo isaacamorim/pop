@@ -151,7 +151,7 @@ function render(items) {
     const PRODUCT_CODE = p.product_code ?? p.PRODUCT_CODE ?? "-";
 
     const TEMPLATE_ID = p.template_id ?? p.TEMPLATE_ID;
-    const VERSION_ID = p.version_id ?? p.VERSION_ID ?? "-";
+    const VERSION_ID = p.version_id ?? p.VERSION_ID ?? "";
     const VERSION_NUM = p.version_num ?? p.VERSION_NUM ?? "-";
     const CREATED_AT = p.created_at ?? p.CREATED_AT ?? null;
     const linkInfo = getLinkHighlight(
@@ -187,8 +187,32 @@ function render(items) {
       </div>
 
       <div class="actions">
-        <button class="btn primary" data-view="${escapeHtml(TEMPLATE_ID)}">Ver</button>
-      </div>
+
+      <button class="btn"
+        data-view="${escapeHtml(TEMPLATE_ID)}"
+        data-version="${escapeHtml(VERSION_ID || "")}">
+        Ver
+      </button>
+
+      ${STATUS === "DRAFT" ? `
+        <button
+          class="btn"
+          data-view="${escapeHtml(TEMPLATE_ID)}"
+          data-version="${escapeHtml(VERSION_ID)}"
+        >
+          ✏️ Editar
+        </button>
+      ` : ""}
+
+      ${STATUS === "PUBLISHED" ? `
+        <button class="btn primary"
+          data-clone-template="${escapeHtml(TEMPLATE_ID)}"
+          data-clone-version="${escapeHtml(VERSION_ID)}">
+          Nova versão
+        </button>
+      ` : ""}
+
+    </div>
     `;
 
     list.appendChild(el);
@@ -196,10 +220,49 @@ function render(items) {
 
   list.querySelectorAll("button[data-view]").forEach(btn => {
     btn.addEventListener("click", () => {
+
       const templateId = btn.getAttribute("data-view");
-      window.location.href = `./pop-view.html?template_id=${encodeURIComponent(templateId)}`;
+      const versionId = btn.getAttribute("data-version");
+
+      if (!versionId || versionId === "null" || versionId === "") {
+        // fallback → abre versão ativa
+        window.location.href =
+          `./pop-view.html?template_id=${encodeURIComponent(templateId)}`;
+        return;
+      }
+
+      window.location.href =
+        `./pop-view.html?template_id=${encodeURIComponent(templateId)}&version_id=${encodeURIComponent(versionId)}`;
     });
   });
+
+  // ======================================
+  // ✏️ EDITAR DRAFT
+  // ======================================
+  list.querySelectorAll("button[data-edit-template]").forEach(btn => {
+
+    btn.addEventListener("click", () => {
+
+      const templateId = btn.getAttribute("data-edit-template");
+      const versionId = btn.getAttribute("data-edit-version");
+
+      window.location.href =
+        `./pop-create.html?edit=1&template_id=${encodeURIComponent(templateId)}&version_id=${encodeURIComponent(versionId)}`;
+
+    });
+
+  });
+
+  list.querySelectorAll("button[data-clone-template]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const templateId = btn.getAttribute("data-clone-template");
+      const versionId = btn.getAttribute("data-clone-version");
+
+      window.location.href =
+        `./pop-create.html?clone=1&template_id=${encodeURIComponent(templateId)}&version_id=${encodeURIComponent(versionId)}`;
+    });
+  });
+
 }
 
 async function load() {

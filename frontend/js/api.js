@@ -50,6 +50,21 @@ export async function apiRequest(method, path, body) {
     return data;
 }
 
+export async function apiPostFile(url, formData) {
+    const res = await fetch(API_BASE + url, {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+    });
+
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || "Erro ao enviar arquivo");
+    }
+
+    return res.json();
+}
+
 export const apiGet = (path) => apiRequest("GET", path);
 export const apiPost = (path, body) => apiRequest("POST", path, body ?? {});
 export const apiPatch = (path, body) => apiRequest("PATCH", path, body ?? {});

@@ -1,5 +1,5 @@
 // frontend/pop_front/js/pop-view.js
-import { apiGet } from "./api.js";
+import { apiGet, apiPost } from "./api.js";
 
 const qs = (sel, root = document) => root.querySelector(sel);
 
@@ -35,6 +35,80 @@ function renderLinkSummary(LINK_TYPE, COD_MAQUINA, COD_TAREFA, NP_CODIGO, SEQ_CO
         return parts.join(" • ");
     }
     return "Procedimento geral";
+}
+
+function renderFooterActions({ STATUS, TEMPLATE_ID, VERSION_ID }) {
+
+    const footer = document.querySelector(".footer-bar");
+    if (!footer) return;
+
+    let actions = `
+        <button id="btnBackFooter" class="btn">← Voltar</button>
+    `;
+
+    // ======================
+    // DRAFT
+    // ======================
+    if (STATUS === "DRAFT" && VERSION_ID) {
+
+        actions += `
+            <button id="btnEditDraft" class="btn primary">
+                ✏️ Continuar edição
+            </button>
+
+            <button id="btnPublish" class="btn success">
+                🚀 Publicar
+            </button>
+        `;
+    }
+
+    // ======================
+    // PUBLISHED
+    // ======================
+    if (STATUS === "PUBLISHED") {
+
+        actions += `
+            <button id="btnNewVersion" class="btn primary">
+                ✏️ Criar nova versão
+            </button>
+        `;
+    }
+
+    footer.innerHTML = actions;
+
+    // voltar
+    qs("#btnBackFooter")?.addEventListener("click", () => {
+        history.length > 1 ? history.back() : (location.href = "./pop-list.html");
+    });
+
+    // editar draft
+    qs("#btnEditDraft")?.addEventListener("click", () => {
+        location.href =
+            `./pop-create.html?edit=1&template_id=${encodeURIComponent(TEMPLATE_ID)}&version_id=${encodeURIComponent(VERSION_ID)}`;
+    });
+
+    // publicar direto
+    qs("#btnPublish")?.addEventListener("click", async () => {
+
+        if (!confirm("Deseja publicar este POP agora?")) return;
+
+        try {
+            await apiPost(`/api/pops/${TEMPLATE_ID}/publish`);
+
+            alert("POP publicado com sucesso!");
+
+            location.reload();
+
+        } catch (e) {
+            alert("Erro ao publicar: " + e.message);
+        }
+    });
+
+    // nova versão
+    qs("#btnNewVersion")?.addEventListener("click", () => {
+        location.href =
+            `./pop-create.html?clone=1&template_id=${encodeURIComponent(TEMPLATE_ID)}&version_id=${encodeURIComponent(VERSION_ID)}`;
+    });
 }
 
 function render(pop) {
@@ -73,11 +147,31 @@ function render(pop) {
         `${CODE} • ${linkLabelMap[LINK_TYPE] || LINK_TYPE} • versão ${VERSION_NUM}`;
 
     // Resumo discreto (versão/status)
-    qs("#status").innerHTML = `
-        <div class="badge">Versão ${escapeHtml(VERSION_NUM)}</div>
-        <div class="badge">Status: ${escapeHtml(STATUS)}</div>
-        ${DESCRIPTION ? `<div style="margin-top:10px; font-size:0.9rem;">${escapeHtml(DESCRIPTION)}</div>` : ""}
+    let statusHtml = `
+        <div class="pop-status">
+            <div class="badge">Versão ${escapeHtml(VERSION_NUM)}</div>
+            <div class="badge">Status: ${escapeHtml(STATUS)}</div>
+        </div>
     `;
+
+    if (STATUS === "DRAFT") {
+        statusHtml += `
+        <div class="alert" style="margin-top:10px;">
+            ⚠️ <b>Rascunho em edição</b><br>
+            Este POP ainda não foi publicado e não está disponível para uso operacional.
+        </div>
+    `;
+    }
+
+    if (DESCRIPTION) {
+        statusHtml += `
+        <div style="margin-top:10px; font-size:0.9rem;">
+            ${escapeHtml(DESCRIPTION)}
+        </div>
+    `;
+    }
+
+    qs("#status").innerHTML = statusHtml;
 
     // Vínculo em 1 linha clara
     const linkSummary = renderLinkSummary(LINK_TYPE, COD_MAQUINA, COD_TAREFA, NP_CODIGO, SEQ_COD, PRODUCT_CODE);
@@ -99,8 +193,15 @@ function render(pop) {
         const title = pick(s, "TITLE", "title") || `Passo ${idx + 1}`;
         const ins = pick(s, "INSTRUCTION", "instruction");
         const photo = !!pick(s, "REQUIRES_PHOTO", "requires_photo");
-        const sign = !!pick(s, "REQUIRES_SIGNATURE", "requires_signature");
-        const img = pick(s, "IMAGE", "image");
+        const hasTime = !!pick(s, "HAS_TIME", "has_time");
+        const time = pick(s, "STEP_TIME", "step_time");
+        const img = pick(
+            s,
+            "IMAGE",
+            "image",
+            "IMAGE_URL",
+            "image_url"
+        );
 
         const div = document.createElement("div");
         div.className = "step";
@@ -112,19 +213,30 @@ function render(pop) {
             </div>
 
             <div class="step-body">
-                <div class="step-body">
                 ${ins
                                 ? `<div class="step-text">${escapeHtml(ins)}</div>`
                                 : `<div class="step-text muted">Sem instruções detalhadas.</div>`
                 }
                 ${ins ? `<div class="step-text">${escapeHtml(ins)}</div>` : ""}
 
-                ${img ? `<img src="${escapeHtml(img)}" class="step-img" alt="Imagem do passo ${idx + 1}" />` : ""}
+                ${img ? `
+                    <div class="step-img-box">
+                        <img 
+                            src="${escapeHtml(img)}" 
+                            class="step-img" 
+                            alt="Imagem do passo ${idx + 1}" 
+                        />
 
-                ${photo || sign ? `
+                        <div class="step-img-caption">
+                            Figura ${idx + 1} — Registro visual do procedimento
+                        </div>
+                    </div>
+                ` : ""}
+
+                ${photo || hasTime ? `
                     <div class="step-flags">
                         ${photo ? `<span class="flag">📷 Foto obrigatória</span>` : ""}
-                        ${sign ? `<span class="flag">✍️ Assinatura obrigatória</span>` : ""}
+                        ${hasTime ? `<span class="flag">⏱ Tempo: ${escapeHtml(time || "-")} min</span>` : ""}
                     </div>
                 ` : ""}
             </div>
@@ -132,17 +244,39 @@ function render(pop) {
 
         stepsEl.appendChild(div);
     });
+
+    renderFooterActions({
+        STATUS,
+        TEMPLATE_ID,
+        VERSION_ID
+    });
+
 }
 
 async function init() {
     const templateId = getParam("template_id");
+    const versionId = getParam("version_id");
+    const validVersion =
+        versionId &&
+        versionId !== "null" &&
+        versionId !== "undefined" &&
+        /^\d+$/.test(versionId);
+
     if (!templateId) {
         qs("#status").innerHTML = `<div class="alert">Faltou template_id na URL.</div>`;
         return;
     }
 
     try {
-        const pop = await apiGet(`/api/pops/${encodeURIComponent(templateId)}`);
+        let pop;
+
+        if (validVersion) {
+            pop = await apiGet(
+                `/api/pops/${encodeURIComponent(templateId)}/versions/${encodeURIComponent(versionId)}`
+            );
+        } else {
+            pop = await apiGet(`/api/pops/${encodeURIComponent(templateId)}`);
+        }
 
         console.log("POP RAW =>", pop);
         const dbg = qs("#debug");
@@ -172,5 +306,44 @@ async function init() {
 
 
 }
+
+// Zoom simples na imagem
+document.addEventListener("click", (e) => {
+
+    const img = e.target.closest(".step-img");
+
+    if (!img) return;
+
+    const overlay = document.createElement("div");
+
+    overlay.style = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        cursor: zoom-out;
+    `;
+
+    const bigImg = document.createElement("img");
+
+    bigImg.src = img.src;
+
+    bigImg.style = `
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    `;
+
+    overlay.appendChild(bigImg);
+
+    overlay.onclick = () => overlay.remove();
+
+    document.body.appendChild(overlay);
+});
+
 
 init();

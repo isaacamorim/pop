@@ -18,6 +18,8 @@ class PopStep(db.Model):
     IPS_REQ_PHOTO = db.Column(db.Boolean, server_default=db.text("FALSE"))
     IPS_REQ_SIGN = db.Column(db.Boolean, server_default=db.text("FALSE"))
     IPS_STATUS = db.Column(db.String(20), nullable=False, server_default="DRAFT")
+    IPS_IMAGE_URL = db.Column(db.String(255))
+    IPS_STEP_TIME = db.Column(db.Integer)
 
     VERSION = db.relationship("PopVersion", back_populates="STEPS")
 
@@ -30,4 +32,6 @@ class PopStep(db.Model):
             "INSTRUCTION": self.IPS_INSTRUCTION,
             "REQ_PHOTO": bool(self.IPS_REQ_PHOTO),
             "REQ_SIGN": bool(self.IPS_REQ_SIGN),
-        }
+            "IMAGE_URL": self.IPS_IMAGE_URL,   # 
+            "STEP_TIME": self.IPS_STEP_TIME,
+    }

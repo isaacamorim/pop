@@ -8,7 +8,7 @@ from .pop_links import bp_links
 from .pop_instances import bp_instances
 from .pop_services import bp_services
 from .lookups import bp_lookups
-from .pops import bp_pops
+from .pops import bp
 from .auth import bp_auth
 
 
@@ -21,5 +21,5 @@ def register_blueprints(app):
     app.register_blueprint(bp_instances)
     app.register_blueprint(bp_services)
     app.register_blueprint(bp_lookups)
-    app.register_blueprint(bp_pops)
+    app.register_blueprint(bp)
     app.register_blueprint(bp_auth)

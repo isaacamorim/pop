@@ -12,7 +12,7 @@
 
 <body>
     <div class="container">
-        <div class="topbar">
+        <div class="pop-header topbar">
             <div>
                 <h1 id="title">POP</h1>
                 <div class="sub" id="subtitle"></div>
@@ -24,6 +24,9 @@
 
         <div class="card">
             <div id="status" class="muted">Carregando...</div>
+            <div class="badge">Versão: v3</div>
+            <div class="badge">Criado em: 12/01/2026</div>
+            <div class="badge">Status: PUBLISHED</div>
             <pre id="debug" style="display:none;"></pre>
         </div>
 
@@ -33,15 +36,18 @@
         </div>
 
         <div class="card">
-            <h3>Passos</h3>
+            <h3 class="section-title">Passos</h3>
             <div id="steps"></div>
         </div>
         
         <div class="footer-bar">
-            <button id="btnBackFooter" class="btn primary">← Sair do POP</button>
+            <button id="btnBackFooter" class="btn">← Voltar</button>
+        
+            <button id="btnNewVersion" class="btn primary">
+                ✏️ Criar nova versão
+            </button>
         </div>
     </div>
-
 
     <script type="module" src="./js/pop-view.js"></script>
 </body>

@@ -1,6 +1,7 @@
 // frontend/pop_front/js/pop-create.js
-import { apiGet, apiPost, apiPatch } from "./api.js";
+import { apiGet, apiPost, apiPatch, apiPostFile } from "./api.js";
 import { requireAuth } from "./auth-guard.js";
+
 
 async function main() {
     // ========================================
@@ -15,9 +16,16 @@ async function main() {
     console.log("[pop-create] Usuário autenticado:", user.nome || user.usuario || user.id);
 
     // ========================================
+    // MODO DE OPERAÇÃO (CREATE / EDIT / CLONE)
+    // ========================================
+    const mode = detectMode();
+    console.log("[pop-create] Modo detectado:", mode);
+
+    // ========================================
     // STATE
     // ========================================
     const state = {
+        mode: mode,
         step: 1,
         draft: {
             TEMPLATE_ID: null,
@@ -38,8 +46,202 @@ async function main() {
     };
 
     // ========================================
-    // UTILS
+    // DETECÇÃO DE MODO
     // ========================================
+    function detectMode() {
+        const params = new URLSearchParams(window.location.search);
+
+        const vid = params.get("version_id");
+
+        if (params.get("edit") === "1" && /^\d+$/.test(vid)) {
+            return {
+                type: "edit",
+                templateId: params.get("template_id"),
+                versionId: vid
+            };
+        }
+
+        if (params.get("clone") === "1") {
+            return {
+                type: "clone",
+                templateId: params.get("template_id"),
+                versionId: params.get("version_id")
+            };
+        }
+
+        return { type: "create" };
+    }
+
+    // ========================================
+    // CARREGAR VERSÃO EXISTENTE
+    // ========================================
+    async function loadExistingVersion() {
+        if (mode.type === "create") return;
+
+        console.log(`[pop-create] Carregando versão (${mode.type})...`);
+
+        let loadedData = null;
+
+        try {
+            const data = await apiGet(
+                `/api/pops/${mode.templateId}/versions/${mode.versionId}`
+            );
+
+            console.log("[pop-create] Metadados carregados:", data);
+            loadedData = data;
+
+            const linkTypeEl = document.getElementById("LINK_TYPE");
+            if (linkTypeEl) linkTypeEl.disabled = true;
+
+            if (mode.type === "edit" && data.STATUS === "PUBLISHED") {
+                toast("⚠️ Esta versão já está publicada. Uma nova versão será criada.", true);
+                mode.type = "clone";
+                state.mode.type = "clone";
+                console.warn("[pop-create] EDIT → CLONE forçado (versão publicada)");
+            }
+
+            const stepsRaw = await apiGet(`/api/steps?version_id=${mode.versionId}`);
+            console.log("[pop-create] Passos carregados:", stepsRaw);
+
+            // NORMALIZAÇÃO
+            const normalized = {
+                TITLE: data.TITLE ?? data.IPT_TITLE ?? data.title ?? "",
+                VERSION_NUM: data.VERSION_NUM ?? data.IPV_VERSION_NUM ?? "",
+                STATUS: data.STATUS ?? data.IPV_STATUS ?? "",
+                LINK_TYPE: data.LINK_TYPE ?? data.IPV_LINK_TYPE ?? "",
+                COD_MAQUINA: data.COD_MAQUINA ?? data.IPV_COD_MAQUINA ?? "",
+                COD_TAREFA: data.COD_TAREFA ?? data.IPV_COD_TAREFA ?? ""
+            };
+
+            loadedData = normalized;
+
+            const steps = (stepsRaw || []).map((s) => ({
+                ID: s.ID || null,
+                TITLE: s.TITLE || "",
+                INSTRUCTION: s.INSTRUCTION || "",
+                REQUIRES_PHOTO: !!s.REQ_PHOTO,
+                STEP_TIME: s.STEP_TIME || "",
+                IMAGE: s.IMAGE_URL || null,   // 
+                HAS_TIME: !!s.STEP_TIME,
+            }));
+
+            state.form = {
+                LINK_TYPE: normalized.LINK_TYPE,
+                COD_MAQUINA: normalized.COD_MAQUINA,
+                COD_TAREFA: normalized.COD_TAREFA,
+                NP_CODIGO: data.NP_CODIGO || "",
+                SEQ_COD: data.SEQ_COD || "",
+                PRODUCT_CODE: data.PRODUCT_CODE || "",
+                TITLE: normalized.TITLE || "",
+                DESCRIPTION: data.DESCRIPTION || "",
+                STEPS: steps,
+            };
+
+            if (mode.type === "edit") {
+                state.draft.TEMPLATE_ID = mode.templateId;
+                state.draft.VERSION_ID = mode.versionId;
+                state.draft.LINK_ID = data.LINK_ID || null;
+            }
+
+            if (mode.type === "clone") {
+                // CLONE começa SEM draft
+                state.draft.TEMPLATE_ID = null;
+                state.draft.VERSION_ID = null;
+                state.draft.LINK_ID = null;
+            }
+
+
+            console.log("[pop-create] Carregando lookups...");
+
+            if (state.form.LINK_TYPE === "MAQUINA") {
+                await loadMachines();
+            }
+
+            if (state.form.LINK_TYPE === "TAREFA") {
+                await loadTasks();
+            }
+
+            setLinkBlocksVisibility();
+            renderSteps();
+
+            toast(`✅ ${mode.type === "edit" ? "Rascunho" : "Versão"} carregado com sucesso`);
+
+        } catch (err) {
+            console.error("[pop-create] Falha ao carregar versão:", err);
+            toast(`Erro ao carregar versão: ${err.message}`, true);
+
+            setTimeout(() => {
+                window.location.href = "./pop-create.html";
+            }, 2000);
+
+            return;
+        }
+
+        const ctx = document.getElementById("popContext");
+
+        if (ctx && loadedData) {
+            const labels = {
+                create: "NOVO POP",
+                edit: "EDIÇÃO DE RASCUNHO",
+                clone: "NOVA VERSÃO (CLONE)",
+            };
+
+            ctx.innerHTML = `
+            <div style="
+                background:#f8fafc;
+                border-left:5px solid #dc2626;
+                border-radius:4px;
+                padding:12px 14px;
+                margin-bottom:16px;
+                font-size:14px;
+            ">
+                <div style="font-weight:600; color:#7f1d1d;">
+                    ${labels[mode.type]}
+                </div>
+
+                <div style="margin-top:4px; font-size:15px;">
+                    📄 <b>${loadedData.TITLE}</b>
+                </div>
+
+                <div style="margin-top:4px; color:#475569;">
+                    Versão base: <b>v${loadedData.VERSION_NUM}</b>
+                    • Status: <b>${loadedData.STATUS}</b>
+                </div>
+            </div>
+        `;
+        }
+    }
+
+    function populateFormFields() {
+        const byId = (id) => document.getElementById(id);
+
+        const linkType = byId("LINK_TYPE");
+        if (linkType) linkType.value = state.form.LINK_TYPE;
+
+        const codMaq = byId("COD_MAQUINA");
+        if (codMaq) codMaq.value = state.form.COD_MAQUINA;
+
+        const codTar = byId("COD_TAREFA");
+        if (codTar) codTar.value = state.form.COD_TAREFA;
+
+        const npCod = byId("NP_CODIGO");
+        if (npCod) npCod.value = state.form.NP_CODIGO;
+
+        const seqCod = byId("SEQ_COD");
+        if (seqCod) seqCod.value = state.form.SEQ_COD;
+
+        const prodCode = byId("PRODUCT_CODE");
+        if (prodCode) prodCode.value = state.form.PRODUCT_CODE;
+
+        const title = byId("TITLE");
+        if (title) title.value = state.form.TITLE;
+
+        const desc = byId("DESCRIPTION");
+        if (desc) desc.value = state.form.DESCRIPTION;
+
+        console.log("[pop-create] Campos populados ✅");
+    }
+
     function toast(msg, isErr = false) {
         const el = document.getElementById("statusMsg");
         if (!el) {
@@ -69,9 +271,6 @@ async function main() {
         if (btnNext) btnNext.style.display = n === 4 ? "none" : "";
     }
 
-    // ========================================
-    // VALIDATION
-    // ========================================
     function validateStep(n) {
         const lt = (state.form.LINK_TYPE || "").toUpperCase();
 
@@ -111,8 +310,6 @@ async function main() {
                     return "Informe NP ou Sequência.";
                 }
             }
-
-            // SERVICO: não exige nada aqui (vai direto pro Step 3)
         }
 
         if (n === 3) {
@@ -120,7 +317,6 @@ async function main() {
                 return "Preencha um título válido (mínimo 3 caracteres).";
             }
 
-            // ✅ Validação de fotos obrigatórias
             for (let i = 0; i < state.form.STEPS.length; i++) {
                 const s = state.form.STEPS[i];
                 if (s.REQUIRES_PHOTO && !s.IMAGE) {
@@ -132,44 +328,102 @@ async function main() {
         return null;
     }
 
-    // ========================================
-    // DRAFT API
-    // ========================================
     async function ensureDraftCreated() {
-        if (state.draft.TEMPLATE_ID) {
-            console.log("[draft] Já existe draft:", state.draft.TEMPLATE_ID);
+        if (state.draft.TEMPLATE_ID) return;
+
+        if (mode.type === "clone") {
+            console.log("🧬 Criando nova versão (clone)...");
+
+            const res = await apiPost(
+                `/api/pops/${mode.templateId}/new-version`,
+                { base_version_id: mode.versionId }
+            );
+
+            state.draft.TEMPLATE_ID = res.template_id;
+            state.draft.VERSION_ID = res.new_version_id;
+            state.draft.LINK_ID = null;
+
+            // 🔥 atualiza URL com IDs REAIS
+            const params = new URLSearchParams(window.location.search);
+            params.set("edit", "1");
+            params.set("template_id", state.draft.TEMPLATE_ID);
+            params.set("version_id", state.draft.VERSION_ID);
+
+            history.replaceState(null, "", "pop-create.html?" + params.toString());
+
+            // muda definitivamente o modo
+            mode.type = "edit";
+            state.mode.type = "edit";
+
+            console.log("✅ NOVA VERSÃO CRIADA");
+            console.log("➡️ TEMPLATE:", state.draft.TEMPLATE_ID);
+            console.log("➡️ VERSION:", state.draft.VERSION_ID);
+
             return;
         }
 
-        console.log("[draft] Criando novo draft...");
+        if (mode.type === "create") {
 
-        const payload = {
-            LINK_TYPE: state.form.LINK_TYPE || "SERVICO",
-            TITLE: state.form.TITLE || "Rascunho",
-            DESCRIPTION: state.form.DESCRIPTION || "",
-            CODE: `POP-${Date.now()}`,
-        };
+            // 🔎 tenta reaproveitar draft existente
+            if (mode.templateId) {
 
-        const response = await apiPost("/api/pops/draft", payload);
+                const existing = await getExistingDraft(mode.templateId);
 
-        const templateId = response.TEMPLATE_ID ?? response.template_id ?? response.templateId;
-        const versionId = response.VERSION_ID ?? response.version_id ?? response.versionId;
-        const linkId = response.LINK_ID ?? response.link_id ?? response.linkId;
+                if (existing) {
 
-        if (!templateId) {
-            console.error("[draft] resposta do /draft sem TEMPLATE_ID:", response);
-            throw new Error("API /pops/draft não retornou TEMPLATE_ID.");
+                    state.draft.TEMPLATE_ID = mode.templateId;
+                    state.draft.VERSION_ID = existing;
+
+                    console.log("♻️ Reusando DRAFT existente");
+
+                    // atualiza URL
+                    const params = new URLSearchParams(window.location.search);
+                    params.set("edit", "1");
+                    params.set("template_id", mode.templateId);
+                    params.set("version_id", existing);
+
+                    history.replaceState(null, "", "pop-create.html?" + params.toString());
+
+                    mode.type = "edit";
+                    state.mode.type = "edit";
+
+                    return;
+                }
+            }
+
+            // 🆕 cria novo somente se não existir
+            const res = await apiPost("/api/pops/draft", {
+                LINK_TYPE: state.form.LINK_TYPE || "SERVICO",
+                TITLE: state.form.TITLE || "Rascunho",
+                DESCRIPTION: state.form.DESCRIPTION || "",
+                CODE: `POP-${Date.now()}`,
+            });
+
+            state.draft.TEMPLATE_ID = res.template_id;
+            state.draft.VERSION_ID = res.version_id;
+            state.draft.LINK_ID = res.link_id;
+
+            // 🔥 FIX CRÍTICO
+            const params = new URLSearchParams(window.location.search);
+
+            params.set("edit", "1");
+            params.set("template_id", res.template_id);
+            params.set("version_id", res.version_id);
+
+            history.replaceState(null, "", "pop-create.html?" + params.toString());
+
+            mode.type = "edit";
+            state.mode.type = "edit";
         }
 
-        state.draft.TEMPLATE_ID = templateId;
-        state.draft.VERSION_ID = versionId ?? null;
-        state.draft.LINK_ID = linkId ?? null;
-
-        console.log("[draft] Criado:", state.draft);
     }
 
     async function saveDraftPartial() {
         await ensureDraftCreated();
+
+        if (!state.draft.TEMPLATE_ID) {
+            throw new Error("Draft não inicializado.");
+        }
 
         console.log("[draft] Salvando parcial...");
 
@@ -185,14 +439,22 @@ async function main() {
             STEPS: state.form.STEPS,
         };
 
-        await apiPatch(`/api/pops/draft/${state.draft.TEMPLATE_ID}`, payload);
-        console.log("[draft] Salvo com sucesso");
+        const res = await apiPatch(
+            `/api/pops/draft/${state.draft.TEMPLATE_ID}`,
+            payload
+        );
+
+        // 🔥 Atualiza IDs dos passos
+        if (res.steps) {
+            state.form.STEPS = state.form.STEPS.map((s, i) => ({
+                ...s,
+                ID: res.steps[i]?.ID || s.ID,
+                IMAGE: res.steps[i]?.IMAGE_URL || s.IMAGE
+            }));
+        }
         toast("Rascunho salvo ✅");
     }
 
-    // ========================================
-    // UI UPDATES
-    // ========================================
     function setLinkBlocksVisibility() {
         const lt = (state.form.LINK_TYPE || "").toUpperCase();
 
@@ -209,9 +471,6 @@ async function main() {
         });
     }
 
-    // ========================================
-    // LOOKUPS
-    // ========================================
     async function loadMachines() {
         const sel = document.getElementById("COD_MAQUINA");
         if (!sel) return;
@@ -223,6 +482,10 @@ async function main() {
             sel.innerHTML =
                 `<option value="">Selecione uma máquina...</option>` +
                 rows.map((r) => `<option value="${r.COD}">${r.COD} - ${r.DESCR}</option>`).join("");
+
+            if (state.form.COD_MAQUINA) {
+                sel.value = state.form.COD_MAQUINA;
+            }
         } catch (err) {
             console.error("[loadMachines] erro:", err);
             sel.innerHTML = `<option value="">Erro ao carregar</option>`;
@@ -241,6 +504,10 @@ async function main() {
             sel.innerHTML =
                 `<option value="">Selecione uma tarefa...</option>` +
                 rows.map((r) => `<option value="${r.COD}">${r.COD} - ${r.DESCR}</option>`).join("");
+
+            if (state.form.COD_TAREFA) {
+                sel.value = state.form.COD_TAREFA;
+            }
         } catch (err) {
             console.error("[loadTasks] erro:", err);
             sel.innerHTML = `<option value="">Erro ao carregar</option>`;
@@ -248,9 +515,6 @@ async function main() {
         }
     }
 
-    // ========================================
-    // PRODUCT SEARCH
-    // ========================================
     let productTimer = null;
 
     async function searchProducts() {
@@ -287,7 +551,7 @@ async function main() {
 
         box.querySelectorAll("[data-cod]").forEach(el => {
             el.addEventListener("click", (e) => {
-                e.stopPropagation(); // 🔥 ESSENCIAL
+                e.stopPropagation();
 
                 const cod = el.getAttribute("data-cod");
                 state.form.PRODUCT_CODE = cod;
@@ -312,13 +576,9 @@ async function main() {
         });
     }
 
-    // ========================================
-    // NP SEARCH
-    // ========================================
     let npTimer = null;
 
     async function searchNps(query = "") {
-        // ✅ não buscar NP se não for NP/PECA_OP
         const lt = (state.form.LINK_TYPE || "").toUpperCase();
         if (lt !== "NP" && lt !== "PECA_OP") return;
 
@@ -354,10 +614,9 @@ async function main() {
                 `;
             }).join("");
 
-            // Adiciona evento de clique em cada item
             box.querySelectorAll("[data-cod]").forEach(el => {
                 el.addEventListener("click", (e) => {
-                    e.stopPropagation(); // 🔥 ESSENCIAL
+                    e.stopPropagation();
 
                     const cod = el.getAttribute("data-cod") || "";
                     const prod = el.getAttribute("data-prod") || "";
@@ -395,7 +654,6 @@ async function main() {
 
         if (!inp) return;
 
-        // Debounce no input (busca após 250ms de pausa)
         inp.addEventListener("input", () => {
             clearTimeout(npTimer);
             const q = inp.value.trim();
@@ -413,14 +671,12 @@ async function main() {
             }, 250);
         });
 
-        // Botão "Listar" (sem filtro)
         if (btnListar) {
             btnListar.onclick = () => {
                 searchNps("").catch(e => toast(e.message, true));
             };
         }
 
-        // Botão "Limpar"
         if (btnLimpar) {
             btnLimpar.onclick = () => {
                 inp.value = "";
@@ -447,7 +703,29 @@ async function main() {
     }
 
     // ========================================
-    // STEPS RENDERING
+    // 🔎 VERIFICA DRAFT EXISTENTE
+    // ========================================
+    async function getExistingDraft(templateId) {
+
+        try {
+            const res = await apiGet(`/api/pops/${templateId}/draft`);
+
+            if (res.exists) {
+                console.log("📌 Draft existente encontrado:", res.version_id);
+                return res.version_id;
+            }
+
+            return null;
+
+        } catch (e) {
+            console.warn("Falha ao verificar draft:", e);
+            return null;
+        }
+    }
+
+
+    // ========================================
+    // 🔥 RENDERSTEPS CORRIGIDO (SEM BUGS)
     // ========================================
     function renderSteps() {
         const wrap = document.getElementById("stepsList");
@@ -456,149 +734,206 @@ async function main() {
         wrap.innerHTML = "";
 
         if (state.form.STEPS.length === 0) {
-            wrap.innerHTML = '<p style="color:#999;">Nenhum passo adicionado ainda.</p>';
+            wrap.innerHTML = "<p style='color:#999;'>Nenhum passo adicionado ainda.</p>";
             return;
         }
 
         state.form.STEPS.forEach((s, idx) => {
             const div = document.createElement("div");
             div.className = "step-item";
-            div.style.cssText = "border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:4px;";
 
             div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <b>Passo ${idx + 1}</b>
-                    <button type="button" class="btn-remove" data-del="${idx}" style="background:crimson; color:white; border:none; padding:4px 8px; cursor:pointer; border-radius:3px;">
-                        Remover
-                    </button>
+                <div class="step-header">
+                    <strong>Passo ${idx + 1}</strong>
+                    <button class="btn-remove" data-i="${idx}">🗑 Remover</button>
                 </div>
 
-                <input 
-                    type="text"
-                    data-k="TITLE" 
-                    data-i="${idx}" 
-                    value="${s.TITLE || ""}" 
-                    placeholder="Título do passo" 
-                    style="width:100%; margin:6px 0; padding:8px; border:1px solid #ccc; border-radius:3px;" 
+                <input class="step-input"
+                    data-k="TITLE"
+                    data-i="${idx}"
+                    placeholder="Título do passo"
+                    value="${s.TITLE || ""}"
                 />
-                
-                <textarea 
-                    data-k="INSTRUCTION" 
-                    data-i="${idx}" 
-                    placeholder="Instrução detalhada" 
-                    style="width:100%; min-height:80px; margin:6px 0; padding:8px; border:1px solid #ccc; border-radius:3px; resize:vertical;"
+
+                <textarea class="step-textarea"
+                    data-k="INSTRUCTION"
+                    data-i="${idx}"
+                    placeholder="Descreva detalhadamente o que deve ser feito"
                 >${s.INSTRUCTION || ""}</textarea>
 
-                <div style="margin-top:8px;">
-                    <label style="margin-right:16px; cursor:pointer;">
-                        <input type="checkbox" data-k="REQUIRES_PHOTO" data-i="${idx}" ${s.REQUIRES_PHOTO ? "checked" : ""}/>
-                        Exigir foto
+                <div class="step-options">
+                    <label class="switch">
+                        <input type="checkbox" 
+                            data-k="REQUIRES_PHOTO" 
+                            data-i="${idx}"
+                            ${s.REQUIRES_PHOTO ? "checked" : ""}
+                        >
+                        <span class="slider"></span>
                     </label>
-
-                    <label style="cursor:pointer;">
-                        <input type="checkbox" data-k="REQUIRES_SIGNATURE" data-i="${idx}" ${s.REQUIRES_SIGNATURE ? "checked" : ""}/>
-                        Exigir assinatura
-                    </label>
+                    <span>Exigir foto</span>
                 </div>
 
-                <div style="margin-top:10px;">
-                    <label>📷 Tire uma foto deste passo</label>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        data-k="IMAGE"
-                        data-i="${idx}"
-                        style="width:100%; margin-top:6px;"
-                    />
-
-                    ${s.IMAGE ? `
-                        <div style="margin-top:8px; position:relative;">
-                            <img src="${s.IMAGE}" style="max-width:100%; border-radius:6px; border:1px solid #ddd;" />
-                            <button type="button" class="btn-remove-img" data-i="${idx}" 
-                                    style="position:absolute; top:8px; right:8px; background:rgba(220,38,38,0.9); color:white; border:none; padding:6px 10px; cursor:pointer; border-radius:4px; font-size:12px;">
-                                Remover foto
-                            </button>
-                        </div>
-                    ` : ""}
+                <div class="step-options">
+                    <label class="switch">
+                        <input type="checkbox" 
+                            data-k="HAS_TIME" 
+                            data-i="${idx}"
+                            ${s.HAS_TIME ? "checked" : ""}
+                        >
+                        <span class="slider"></span>
+                    </label>
+                    <span>Informar tempo</span>
                 </div>
+
+                ${s.HAS_TIME ? `
+                    <div class="step-time">
+                        ⏱ Tempo estimado (min)
+                        <input type="number" 
+                            min="1" 
+                            data-k="STEP_TIME" 
+                            data-i="${idx}"
+                            value="${s.STEP_TIME || ""}"
+                        />
+                    </div>
+                ` : ""}
+
+                <div class="step-photo">
+                    ${s.IMAGE
+                                    ? `<img src="${s.IMAGE}" class="photo-preview" />
+                        <button type="button" class="photo-remove" data-i="${idx}">
+                            Remover foto
+                        </button>`
+                                    : `<button type="button" class="photo-btn" data-i="${idx}">
+                            📷 Adicionar foto do passo
+                        </button>`
+                    }
+                </div>
+
             `;
 
             wrap.appendChild(div);
         });
 
-        // Bind inputs
-        wrap.querySelectorAll("[data-k]").forEach((el) => {
-            const handler = (e) => {
+        // =============================
+        // INPUTS / CHECKBOX / NUMBER
+        // =============================
+        wrap.querySelectorAll("[data-k]").forEach(el => {
+            el.addEventListener("input", e => {
                 const i = Number(e.target.dataset.i);
                 const k = e.target.dataset.k;
 
-                if (e.target.type === "file") {
-                    const file = e.target.files[0];
-                    if (!file) return;
-
-                    // ✅ Validação de tamanho (máx 5MB)
-                    if (file.size > 5 * 1024 * 1024) {
-                        toast("Imagem muito grande. Máximo 5MB.", true);
-                        e.target.value = "";
-                        return;
-                    }
-
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        state.form.STEPS[i].IMAGE = reader.result; // base64
-                        renderSteps(); // 🔥 re-render para mostrar preview
-                        toast("Foto adicionada ✅");
-                    };
-                    reader.readAsDataURL(file);
+                // Toggle "Exigir foto"
+                if (k === "REQUIRES_PHOTO") {
+                    state.form.STEPS[i].REQUIRES_PHOTO = e.target.checked;
+                    renderSteps();
                     return;
                 }
 
-                if (e.target.type === "checkbox") {
-                    state.form.STEPS[i][k] = e.target.checked;
-                } else {
-                    state.form.STEPS[i][k] = e.target.value;
+                // Toggle "Informar tempo"
+                if (k === "HAS_TIME") {
+                    state.form.STEPS[i].HAS_TIME = e.target.checked;
+                    if (!e.target.checked) {
+                        state.form.STEPS[i].STEP_TIME = "";
+                    }
+                    renderSteps();
+                    return;
                 }
-            };
 
-            el.addEventListener("input", handler);
-            el.addEventListener("change", handler);
+                // Inputs normais (text, number, textarea)
+                state.form.STEPS[i][k] = e.target.value;
+            });
         });
 
-        // Bind delete buttons
-        wrap.querySelectorAll("[data-del]").forEach((btn) => {
+        // =============================
+        // REMOVER PASSO
+        // =============================
+        wrap.querySelectorAll(".btn-remove").forEach(btn => {
             btn.addEventListener("click", () => {
-                const i = Number(btn.dataset.del);
+                const i = Number(btn.dataset.i);
                 if (confirm(`Remover o Passo ${i + 1}?`)) {
                     state.form.STEPS.splice(i, 1);
                     renderSteps();
-                    toast("Passo removido");
                 }
             });
         });
 
-        // ✅ Bind botão remover foto
-        wrap.querySelectorAll(".btn-remove-img").forEach((btn) => {
+        // =============================
+        // ADICIONAR FOTO
+        // =============================
+        wrap.querySelectorAll(".photo-btn").forEach(btn => {
+            btn.addEventListener("click", async () => { // 👈 async aqui
+                const i = Number(btn.dataset.i);
+
+                if (!state.form.STEPS[i].ID) {
+
+                    toast("Salvando rascunho antes de enviar foto...");
+
+                    try {
+                        await saveDraftPartial();
+
+                    } catch (e) {
+                        toast("Erro ao salvar antes da foto", true);
+                        return;
+                    }
+
+                    if (!state.form.STEPS[i].ID) {
+                        toast("Falha ao gerar ID do passo", true);
+                        return;
+                    }
+                }
+
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/*";
+
+                input.onchange = e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    if (file.size > 5 * 1024 * 1024) {
+                        toast("Imagem muito grande (máx 5MB)", true);
+                        return;
+                    }
+
+                    const form = new FormData();
+                    form.append("file", file);
+
+                    apiPostFile(`/api/steps/${state.form.STEPS[i].ID}/image`, form)
+                        .then(res => {
+                            state.form.STEPS[i].IMAGE = res.image_url;
+                            renderSteps();
+                            toast("Foto salva ✅");
+                        })
+                        .catch(err => {
+                            console.error("Erro ao fazer upload:", err);
+                            toast(err.message || "Erro ao salvar foto", true);
+                        });
+                };
+
+                input.click();
+            });
+        });
+
+        // =============================
+        // REMOVER FOTO
+        // =============================
+        wrap.querySelectorAll(".photo-remove").forEach(btn => {
             btn.addEventListener("click", () => {
                 const i = Number(btn.dataset.i);
-                if (confirm("Remover foto deste passo?")) {
-                    state.form.STEPS[i].IMAGE = null;
-                    renderSteps();
-                    toast("Foto removida");
-                }
+                state.form.STEPS[i].IMAGE = null;
+                renderSteps();
             });
         });
     }
 
-    // ========================================
-    // REVIEW
-    // ========================================
     function renderReview() {
         const el = document.getElementById("review");
         if (!el) return;
 
         const summary = {
+            MODE: mode.type.toUpperCase(),
             TEMPLATE_ID: state.draft.TEMPLATE_ID,
+            VERSION_ID: state.draft.VERSION_ID,
             LINK_TYPE: state.form.LINK_TYPE,
             COD_MAQUINA: state.form.COD_MAQUINA || "-",
             COD_TAREFA: state.form.COD_TAREFA || "-",
@@ -614,13 +949,9 @@ async function main() {
         el.textContent = JSON.stringify(summary, null, 2);
     }
 
-    // ========================================
-    // EVENT BINDING
-    // ========================================
     function bindInputs() {
         const byId = (id) => document.getElementById(id);
 
-        // ========== ETAPA 1: LINK_TYPE ==========
         const linkType = byId("LINK_TYPE");
         const hintLink = byId("hintLink");
 
@@ -631,7 +962,6 @@ async function main() {
 
                 setLinkBlocksVisibility();
 
-                // Update hint
                 if (hintLink) {
                     const hints = {
                         MAQUINA: "Aparece na tela de máquinas (manutenção/rotina).",
@@ -644,7 +974,6 @@ async function main() {
                     hintLink.textContent = hints[state.form.LINK_TYPE] || "";
                 }
 
-                // Auto-suggest title
                 if (!state.form.TITLE) {
                     const titleSuggestions = {
                         MAQUINA: "Ligar máquina",
@@ -659,7 +988,6 @@ async function main() {
                     if (titleEl) titleEl.value = state.form.TITLE;
                 }
 
-                // ✅ LIMPA NP se mudar pra outro tipo que não usa NP
                 const lt = state.form.LINK_TYPE;
                 if (lt !== "NP" && lt !== "PECA_OP") {
                     state.form.NP_CODIGO = "";
@@ -681,7 +1009,6 @@ async function main() {
                     }
                 }
 
-                // ✅ LIMPA PRODUTO se mudar pra outro tipo que não usa produto
                 if (!["PECA", "PECA_OP"].includes(lt)) {
                     state.form.PRODUCT_CODE = "";
 
@@ -698,14 +1025,12 @@ async function main() {
                     }
                 }
 
-                // ✅ se entrou em PECA_OP, força escolher produto válido
                 if (lt === "PECA_OP") {
                     state.form.PRODUCT_CODE = "";
                     const pc = byId("PRODUCT_CODE");
                     if (pc) pc.value = "";
                 }
 
-                // Load lookups
                 try {
                     if (state.form.LINK_TYPE === "MAQUINA") await loadMachines();
                     if (state.form.LINK_TYPE === "TAREFA") await loadTasks();
@@ -715,7 +1040,6 @@ async function main() {
             });
         }
 
-        // ========== ETAPA 2: DETALHES ==========
         const codMaq = byId("COD_MAQUINA");
         if (codMaq) {
             codMaq.addEventListener("change", (e) => {
@@ -746,7 +1070,6 @@ async function main() {
             });
         }
 
-        // ========== ETAPA 3: CONTEÚDO ==========
         const title = byId("TITLE");
         if (title) {
             title.addEventListener("input", (e) => {
@@ -768,15 +1091,15 @@ async function main() {
                     TITLE: `Passo ${state.form.STEPS.length + 1}`,
                     INSTRUCTION: "",
                     REQUIRES_PHOTO: false,
-                    REQUIRES_SIGNATURE: false,
+                    STEP_TIME: "",
                     IMAGE: null,
+                    HAS_TIME: false
                 });
                 renderSteps();
                 toast("Passo adicionado");
             });
         }
 
-        // ========== NAVEGAÇÃO ==========
         const btnBack = byId("btnBack");
         if (btnBack) {
             btnBack.addEventListener("click", () => {
@@ -793,7 +1116,6 @@ async function main() {
                 if (err) return toast(err, true);
 
                 try {
-                    // só salva se já tiver LINK_TYPE escolhido
                     if (state.form.LINK_TYPE) {
                         await saveDraftPartial();
                     }
@@ -810,11 +1132,19 @@ async function main() {
             });
         }
 
-        // ========== PUBLICAR ==========
+        console.log("🚀 PUBLICANDO");
+        console.log("➡️ TEMPLATE_ID:", state.draft.TEMPLATE_ID);
+        console.log("➡️ VERSION_ID:", state.draft.VERSION_ID);
+        console.log("➡️ MODE:", mode.type);
+
         const btnPublish = byId("btnPublish");
         if (btnPublish) {
             btnPublish.addEventListener("click", async () => {
-                if (!confirm("Deseja publicar este POP? Ele ficará disponível para todos.")) {
+                const confirmMsg = mode.type === "clone"
+                    ? "Deseja publicar esta NOVA VERSÃO? A versão anterior será desativada."
+                    : "Deseja publicar este POP? Ele ficará disponível para todos.";
+
+                if (!confirm(confirmMsg)) {
                     return;
                 }
 
@@ -826,7 +1156,14 @@ async function main() {
                     }
 
                     await saveDraftPartial();
-                    await apiPost(`/api/pops/${state.draft.TEMPLATE_ID}/publish`, {});
+
+                    if (!state.draft.TEMPLATE_ID) {
+                        throw new Error("Template inválido para publicação");
+                    }
+
+                    console.log("🚀 Publicando TEMPLATE:", state.draft.TEMPLATE_ID);
+
+                    await apiPost(`/api/pops/${state.draft.TEMPLATE_ID}/publish`);
 
                     toast("POP publicado com sucesso! ✅");
                     setTimeout(() => {
@@ -842,20 +1179,33 @@ async function main() {
         console.log("[wizard] Event listeners registrados ✅");
     }
 
-    // ========================================
-    // INIT
-    // ========================================
-    function init() {
+    async function init() {
         console.log("[pop-create] Inicializando wizard...");
 
         bindInputs();
         wireNpSearch();
         wireProductSearch();
-        setLinkBlocksVisibility();
-        showStep(1);
-        renderSteps();
 
-        // ✅ fechar dropdown ao clicar fora (UX profissional)
+        await loadExistingVersion();
+
+        setLinkBlocksVisibility();
+
+        if (mode.type === "create" && !state.draft.TEMPLATE_ID) {
+            showStep(1);
+            renderSteps();
+        } else {
+            showStep(3);
+            populateFormFields();
+        }
+
+        if (mode.type !== "create") {
+            const btnBack = document.getElementById("btnBack");
+            if (btnBack && state.step === 3) {
+                btnBack.disabled = true;
+                btnBack.title = "Não é possível voltar para configuração de vínculo em modo edição/clone";
+            }
+        }
+
         document.addEventListener("click", (e) => {
             const npBox = document.getElementById("npResults");
             const npQ = document.getElementById("NP_Q");
@@ -888,11 +1238,7 @@ async function main() {
         console.log("[pop-create] Wizard pronto! ✅");
     }
 
-    // Start
     init();
 }
 
-// ========================================
-// RUN
-// ========================================
 main();

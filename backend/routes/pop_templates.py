@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify
 from extensions import db
 from models.pop_template import PopTemplate
 from datetime import datetime
+from models.pop_version import PopVersion
 
 bp_templates = Blueprint("bp_templates", __name__, url_prefix="/api/templates")
 
@@ -45,7 +46,17 @@ def get_template(template_id: int):
 @bp_templates.patch("/<int:template_id>")
 def update_template(template_id: int):
     t = PopTemplate.query.get_or_404(template_id)
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
+
+    # 🔴 REGRA: se template estiver publicado,
+    # só permite edição se existir versão DRAFT
+    if not t.IPT_ACTIVE:
+        draft_version = PopVersion.query.filter_by(
+            IPV_TEMPLATE_ID=template_id, IPV_STATUS="DRAFT"
+        ).first()
+
+    if pop.STATUS == "PUBLISHED" and not draft_version:
+        return jsonify({"error": "POP já publicado. Crie nova versão."}), 409
 
     for field, col in [
         ("CODE", "IPT_CODE"),

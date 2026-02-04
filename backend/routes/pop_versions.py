@@ -26,6 +26,8 @@ def create_version():
         IPV_IS_STANDARD=data.get("IS_STANDARD", True),
         IPV_CREATED_BY=data.get("CREATED_BY"),
         IPV_ACTIVE=data.get("ACTIVE", True),
+        IPV_STATUS=data.get("STATUS", "DRAFT"),
+        # IPV_BASE_VERSION_ID=db.Column(db.BigInteger, db.ForeignKey("I_POP_VERSION.IPV_ID"), nullable=True),
     )
 
     db.session.add(v)
@@ -35,7 +37,11 @@ def create_version():
 
 @bp_versions.get("/<int:version_id>")
 def get_version(version_id: int):
-    v = PopVersion.query.get_or_404(version_id)
+    v = (
+        PopVersion.query.filter(PopVersion.IPV_ID == version_id)
+        .filter(PopVersion.IPV_STATUS.in_(["DRAFT", "PUBLISHED"]))
+        .first_or_404()
+    )
     include = request.args.get("include_children", "0") == "1"
     return jsonify(v.to_dict(include_children=include))
 
@@ -43,7 +49,11 @@ def get_version(version_id: int):
 @bp_versions.patch("/<int:version_id>")
 def update_version(version_id: int):
     v = PopVersion.query.get_or_404(version_id)
-    data = request.get_json(force=True)
+
+    if v.IPV_STATUS == "PUBLISHED":
+        return jsonify({"error": "Versão publicada não pode ser editada"}), 400
+
+    data = request.get_json(force=True) or {}
 
     for field, col in [
         ("SUMMARY", "IPV_SUMMARY"),
@@ -63,7 +73,7 @@ def update_version(version_id: int):
 @bp_versions.get("")
 def list_versions():
     template_id = request.args.get("template_id", type=int)
-    q = PopVersion.query
+    q = PopVersion.query.filter(PopVersion.IPV_STATUS.in_(["DRAFT", "PUBLISHED"]))
     if template_id:
         q = q.filter(PopVersion.IPV_TEMPLATE_ID == template_id)
     versions = q.order_by(PopVersion.IPV_ID.desc()).all()

@@ -1,52 +1,67 @@
 <!--frontend/pop_front/pop-view.html-->
-
 <!doctype html>
 <html lang="pt-br">
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Visualização de Procedimento Operacional Padrão (POP)" />
     <title>Ver POP</title>
     <link rel="stylesheet" href="./css/style.css" />
 </head>
 
 <body>
     <div class="container">
-        <div class="pop-header topbar">
+        <!-- Header Principal -->
+        <header class="pop-header topbar">
             <div>
                 <h1 id="title">POP</h1>
-                <div class="sub" id="subtitle"></div>
+                <div class="sub" id="subtitle">Carregando informações...</div>
             </div>
             <div class="top-actions">
-                <button id="btnBack" class="btn">← Voltar</button>
+                <button id="btnBack" class="btn" aria-label="Voltar para lista">
+                    <span>←</span> Voltar
+                </button>
             </div>
-        </div>
+        </header>
 
-        <div class="card">
-            <div id="status" class="muted">Carregando...</div>
-            <div class="badge">Versão: v3</div>
-            <div class="badge">Criado em: 12/01/2026</div>
-            <div class="badge">Status: PUBLISHED</div>
+        <!-- Status e Informações Gerais -->
+        <section class="card">
+            <div id="status" class="muted">
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 1.2rem;">⏳</div>
+                    <div style="margin-top: 8px;">Carregando...</div>
+                </div>
+            </div>
             <pre id="debug" style="display:none;"></pre>
-        </div>
+        </section>
 
-        <div class="card">
-            <h3>Vínculo</h3>
-            <div id="link"></div>
-        </div>
+        <!-- Vínculo -->
+        <section class="card">
+            <h3 class="section-title">🔗 Vínculo</h3>
+            <div id="link">
+                <div style="text-align: center; color: var(--muted); padding: 20px;">
+                    Carregando informações de vínculo...
+                </div>
+            </div>
+        </section>
 
-        <div class="card">
-            <h3 class="section-title">Passos</h3>
-            <div id="steps"></div>
-        </div>
-        
-        <div class="footer-bar">
-            <button id="btnBackFooter" class="btn">← Voltar</button>
-        
-            <button id="btnNewVersion" class="btn primary">
-                ✏️ Criar nova versão
+        <!-- Passos do Procedimento -->
+        <section class="card">
+            <h3 class="section-title">📋 Passos</h3>
+            <div id="steps" class="steps">
+                <div style="text-align: center; color: var(--muted); padding: 20px;">
+                    Carregando passos do procedimento...
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer com Ações -->
+        <footer class="footer-bar">
+            <button id="btnBackFooter" class="btn">
+                <span>←</span> Voltar
             </button>
-        </div>
+        </footer>
     </div>
 
     <script type="module" src="./js/pop-view.js"></script>

@@ -7,6 +7,7 @@ from models.pop_version import PopVersion
 from models.pop_link import PopLink
 from models.pop_step import PopStep
 from .auth_guard import login_required
+from .gravar_log import gravar_log
 from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
@@ -111,7 +112,7 @@ def create_draft():
     db.session.add(l)
     db.session.flush()  # pega IPL_ID
 
-    gravar_log(t.IPT_ID, f"SYSALL -> POP | CRIAR | {t.IPT_CODE}")
+    gravar_log(t.IPT_ID, "CRIAR", t.IPT_CODE)
 
     db.session.commit()
 
@@ -259,6 +260,8 @@ def update_draft(template_id: str):
             if sid not in sent_ids:
                 db.session.delete(step)
 
+    gravar_log(t.IPT_ID, "EDITAR", f"Versão {v.IPV_VERSION_NUM}")
+
     db.session.commit()
     # retorna steps com ID
     steps = PopStep.query.filter_by(IPS_VERSION_ID=v.IPV_ID).order_by(PopStep.IPS_SEQ).all()
@@ -387,7 +390,7 @@ def publish(template_id: str):
             {"lid": l.IPL_ID},
         )
 
-    gravar_log(t.IPT_ID, f"SYSALL -> POP | CRIAR | {t.IPT_CODE}")
+    gravar_log(t.IPT_ID, "PUBLICAR", t.IPT_CODE)
 
     db.session.commit()
 
@@ -656,6 +659,8 @@ def create_new_version(template_id: str):
 
     db.session.commit()
 
+    gravar_log(template.IPT_ID, "NOVA_VERSAO", f"Base v{base_version.IPV_VERSION_NUM}")
+
     return (
         jsonify(
             {
@@ -778,39 +783,3 @@ def get_active_draft(template_id):
         return jsonify({"exists": False})
 
     return jsonify({"exists": True, "version_id": row[0], "version_num": row[1]})
-
-
-TELA_POP = 1130  # código liberado no ERP para a tela do I_POP_TEMPLATE
-
-def gravar_log(chave, funcao, tela=1130, empresa=1):
-
-    try:
-
-        # 🔥 pega usuário da sessão
-        usuario = session.get("user", {}).get("usuario") or "SISTEMA"
-
-        db.session.execute(
-            text(
-                """
-            BEGIN
-                GRAVAR_LOG(
-                    p_CHAVE   => :chave,
-                    p_TELA    => :tela,
-                    p_FUNCAO  => :funcao,
-                    p_EMPRESA => :empresa,
-                    p_USUARI  => :usuario
-                );
-            END;
-            """
-            ),
-            {
-                "chave": str(chave),
-                "tela": int(tela),
-                "funcao": funcao[:2000],
-                "empresa": int(empresa),
-                "usuario": usuario[:30],  # limite da coluna
-            },
-        )
-
-    except Exception as e:
-        print("⚠️ ERRO AO GRAVAR LOG:", e)

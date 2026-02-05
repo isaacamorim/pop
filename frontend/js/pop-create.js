@@ -2,11 +2,104 @@
 import { apiGet, apiPost, apiPatch, apiPostFile } from "./api.js";
 import { requireAuth } from "./auth-guard.js";
 
+// ============================================
+// TOAST SYSTEM MELHORADO
+// ============================================
+function showToast(message, type = "info") {
+    const existingToast = document.querySelector(".toast");
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+
+    const icon = {
+        success: "✓",
+        error: "✕",
+        info: "ℹ️",
+        warning: "⚠️"
+    }[type] || "ℹ️";
+
+    toast.innerHTML = `<span style="font-size: 1.2rem; margin-right: 8px;">${icon}</span> ${message}`;
+
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === "success" ? "#16a34a" : type === "error" ? "#dc2626" : type === "warning" ? "#f59e0b" : "#3b82f6"};
+        color: white;
+        padding: 14px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        font-weight: 600;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        max-width: 400px;
+        animation: slideIn 0.3s ease;
+    `;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = "slideOut 0.3s ease";
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// Adiciona animações CSS se não existir
+if (!document.getElementById("toast-animations")) {
+    const style = document.createElement("style");
+    style.id = "toast-animations";
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(400px); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// ============================================
+// AUTO-SAVE INDICATOR
+// ============================================
+function showAutoSaveIndicator() {
+    let indicator = document.getElementById("autoSaveIndicator");
+    if (!indicator) return;
+
+    indicator.style.display = "block";
+    indicator.textContent = "💾 Salvando automaticamente...";
+
+    setTimeout(() => {
+        indicator.textContent = "✓ Salvo";
+        setTimeout(() => {
+            indicator.style.display = "none";
+        }, 1000);
+    }, 800);
+}
+
+// ============================================
+// PROGRESS BAR DO WIZARD
+// ============================================
+function updateWizardProgress(currentStep) {
+    document.querySelectorAll(".wizard-step").forEach(step => {
+        const stepNum = parseInt(step.dataset.step);
+        step.classList.remove("active", "completed");
+
+        if (stepNum === currentStep) {
+            step.classList.add("active");
+        } else if (stepNum < currentStep) {
+            step.classList.add("completed");
+        }
+    });
+}
 
 async function main() {
-    // ========================================
     // AUTH CHECK
-    // ========================================
     const user = await requireAuth();
     if (!user) {
         console.warn("[pop-create] não autenticado -> redirecionado pelo guard");
@@ -15,15 +108,11 @@ async function main() {
 
     console.log("[pop-create] Usuário autenticado:", user.nome || user.usuario || user.id);
 
-    // ========================================
-    // MODO DE OPERAÇÃO (CREATE / EDIT / CLONE)
-    // ========================================
+    // MODO DE OPERAÇÃO
     const mode = detectMode();
     console.log("[pop-create] Modo detectado:", mode);
 
-    // ========================================
     // STATE
-    // ========================================
     const state = {
         mode: mode,
         step: 1,
@@ -45,12 +134,8 @@ async function main() {
         },
     };
 
-    // ========================================
-    // DETECÇÃO DE MODO
-    // ========================================
     function detectMode() {
         const params = new URLSearchParams(window.location.search);
-
         const vid = params.get("version_id");
 
         if (params.get("edit") === "1" && /^\d+$/.test(vid)) {
@@ -72,14 +157,10 @@ async function main() {
         return { type: "create" };
     }
 
-    // ========================================
-    // CARREGAR VERSÃO EXISTENTE
-    // ========================================
     async function loadExistingVersion() {
         if (mode.type === "create") return;
 
         console.log(`[pop-create] Carregando versão (${mode.type})...`);
-
         let loadedData = null;
 
         try {
@@ -94,7 +175,7 @@ async function main() {
             if (linkTypeEl) linkTypeEl.disabled = true;
 
             if (mode.type === "edit" && data.STATUS === "PUBLISHED") {
-                toast("⚠️ Esta versão já está publicada. Uma nova versão será criada.", true);
+                showToast("Esta versão já está publicada. Uma nova versão será criada.", "warning");
                 mode.type = "clone";
                 state.mode.type = "clone";
                 console.warn("[pop-create] EDIT → CLONE forçado (versão publicada)");
@@ -103,7 +184,6 @@ async function main() {
             const stepsRaw = await apiGet(`/api/steps?version_id=${mode.versionId}`);
             console.log("[pop-create] Passos carregados:", stepsRaw);
 
-            // NORMALIZAÇÃO
             const normalized = {
                 TITLE: data.TITLE ?? data.IPT_TITLE ?? data.title ?? "",
                 VERSION_NUM: data.VERSION_NUM ?? data.IPV_VERSION_NUM ?? "",
@@ -121,7 +201,7 @@ async function main() {
                 INSTRUCTION: s.INSTRUCTION || "",
                 REQUIRES_PHOTO: !!s.REQ_PHOTO,
                 STEP_TIME: s.STEP_TIME || "",
-                IMAGE: s.IMAGE_URL || null,   // 
+                IMAGE: s.IMAGE_URL || null,
                 HAS_TIME: !!s.STEP_TIME,
             }));
 
@@ -144,12 +224,10 @@ async function main() {
             }
 
             if (mode.type === "clone") {
-                // CLONE começa SEM draft
                 state.draft.TEMPLATE_ID = null;
                 state.draft.VERSION_ID = null;
                 state.draft.LINK_ID = null;
             }
-
 
             console.log("[pop-create] Carregando lookups...");
 
@@ -164,11 +242,11 @@ async function main() {
             setLinkBlocksVisibility();
             renderSteps();
 
-            toast(`✅ ${mode.type === "edit" ? "Rascunho" : "Versão"} carregado com sucesso`);
+            showToast(`${mode.type === "edit" ? "Rascunho" : "Versão"} carregado com sucesso`, "success");
 
         } catch (err) {
             console.error("[pop-create] Falha ao carregar versão:", err);
-            toast(`Erro ao carregar versão: ${err.message}`, true);
+            showToast(`Erro ao carregar versão: ${err.message}`, "error");
 
             setTimeout(() => {
                 window.location.href = "./pop-create.html";
@@ -187,28 +265,19 @@ async function main() {
             };
 
             ctx.innerHTML = `
-            <div style="
-                background:#f8fafc;
-                border-left:5px solid #dc2626;
-                border-radius:4px;
-                padding:12px 14px;
-                margin-bottom:16px;
-                font-size:14px;
-            ">
-                <div style="font-weight:600; color:#7f1d1d;">
-                    ${labels[mode.type]}
+                <div class="context-banner">
+                    <div class="context-banner-title">
+                        ${labels[mode.type]}
+                    </div>
+                    <div class="context-banner-content">
+                        📄 <b>${loadedData.TITLE}</b>
+                    </div>
+                    <div class="context-banner-meta">
+                        Versão base: <b>v${loadedData.VERSION_NUM}</b>
+                        • Status: <b>${loadedData.STATUS}</b>
+                    </div>
                 </div>
-
-                <div style="margin-top:4px; font-size:15px;">
-                    📄 <b>${loadedData.TITLE}</b>
-                </div>
-
-                <div style="margin-top:4px; color:#475569;">
-                    Versão base: <b>v${loadedData.VERSION_NUM}</b>
-                    • Status: <b>${loadedData.STATUS}</b>
-                </div>
-            </div>
-        `;
+            `;
         }
     }
 
@@ -243,22 +312,26 @@ async function main() {
     }
 
     function toast(msg, isErr = false) {
+        showToast(msg, isErr ? "error" : "success");
+
+        // Fallback para status message
         const el = document.getElementById("statusMsg");
-        if (!el) {
-            alert(msg);
-            return;
+        if (el) {
+            el.textContent = msg;
+            el.className = `status-message ${isErr ? "error" : "success"}`;
+            setTimeout(() => {
+                el.textContent = "";
+                el.className = "status-message";
+            }, 3000);
         }
-        el.textContent = msg;
-        el.style.color = isErr ? "crimson" : "green";
-        el.style.fontWeight = "bold";
-        setTimeout(() => {
-            el.textContent = "";
-        }, 3000);
     }
 
     function showStep(n) {
         state.step = n;
         console.log("[wizard] Mostrando step:", n);
+
+        // Atualiza progress bar
+        updateWizardProgress(n);
 
         document.querySelectorAll(".wstep").forEach((sec) => {
             sec.style.display = Number(sec.dataset.step) === n ? "" : "none";
@@ -269,6 +342,9 @@ async function main() {
 
         if (btnBack) btnBack.disabled = n === 1;
         if (btnNext) btnNext.style.display = n === 4 ? "none" : "";
+
+        // Scroll suave para o topo
+        window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function validateStep(n) {
@@ -343,7 +419,6 @@ async function main() {
             state.draft.VERSION_ID = res.new_version_id;
             state.draft.LINK_ID = null;
 
-            // 🔥 atualiza URL com IDs REAIS
             const params = new URLSearchParams(window.location.search);
             params.set("edit", "1");
             params.set("template_id", state.draft.TEMPLATE_ID);
@@ -351,7 +426,6 @@ async function main() {
 
             history.replaceState(null, "", "pop-create.html?" + params.toString());
 
-            // muda definitivamente o modo
             mode.type = "edit";
             state.mode.type = "edit";
 
@@ -363,20 +437,15 @@ async function main() {
         }
 
         if (mode.type === "create") {
-
-            // 🔎 tenta reaproveitar draft existente
             if (mode.templateId) {
-
                 const existing = await getExistingDraft(mode.templateId);
 
                 if (existing) {
-
                     state.draft.TEMPLATE_ID = mode.templateId;
                     state.draft.VERSION_ID = existing;
 
                     console.log("♻️ Reusando DRAFT existente");
 
-                    // atualiza URL
                     const params = new URLSearchParams(window.location.search);
                     params.set("edit", "1");
                     params.set("template_id", mode.templateId);
@@ -391,7 +460,6 @@ async function main() {
                 }
             }
 
-            // 🆕 cria novo somente se não existir
             const res = await apiPost("/api/pops/draft", {
                 LINK_TYPE: state.form.LINK_TYPE || "SERVICO",
                 TITLE: state.form.TITLE || "Rascunho",
@@ -403,9 +471,7 @@ async function main() {
             state.draft.VERSION_ID = res.version_id;
             state.draft.LINK_ID = res.link_id;
 
-            // 🔥 FIX CRÍTICO
             const params = new URLSearchParams(window.location.search);
-
             params.set("edit", "1");
             params.set("template_id", res.template_id);
             params.set("version_id", res.version_id);
@@ -415,7 +481,6 @@ async function main() {
             mode.type = "edit";
             state.mode.type = "edit";
         }
-
     }
 
     async function saveDraftPartial() {
@@ -426,6 +491,7 @@ async function main() {
         }
 
         console.log("[draft] Salvando parcial...");
+        showAutoSaveIndicator();
 
         const payload = {
             LINK_TYPE: state.form.LINK_TYPE,
@@ -444,7 +510,6 @@ async function main() {
             payload
         );
 
-        // 🔥 Atualiza IDs dos passos
         if (res.steps) {
             state.form.STEPS = state.form.STEPS.map((s, i) => ({
                 ...s,
@@ -452,6 +517,7 @@ async function main() {
                 IMAGE: res.steps[i]?.IMAGE_URL || s.IMAGE
             }));
         }
+
         toast("Rascunho salvo ✅");
     }
 
@@ -535,17 +601,15 @@ async function main() {
 
         if (!rows.length) {
             box.style.display = "block";
-            box.innerHTML = `<div class="muted" style="padding:8px;">Nenhum produto encontrado.</div>`;
+            box.innerHTML = `<div class="search-result-item" style="opacity: 0.6; cursor: default;">Nenhum produto encontrado.</div>`;
             return;
         }
 
         box.style.display = "block";
         box.innerHTML = rows.map(r => `
-            <div class="item" style="padding:8px; border-bottom:1px solid var(--border); cursor:pointer;" data-cod="${r.COD}">
-                <div class="meta">
-                    <div class="title">${r.COD} <span class="muted" style="font-weight:500;">(${r.STATUS})</span></div>
-                    <div class="small">${r.DESCR || ""}</div>
-                </div>
+            <div class="search-result-item" data-cod="${r.COD}">
+                <div class="search-result-title">${r.COD} <span style="font-weight: 400; color: var(--muted);">(${r.STATUS})</span></div>
+                <div class="search-result-subtitle">${r.DESCR || ""}</div>
             </div>
         `).join("");
 
@@ -595,7 +659,7 @@ async function main() {
 
             if (!rows.length) {
                 box.style.display = "block";
-                box.innerHTML = `<div class="muted" style="padding:8px;">Nenhuma NP encontrada.</div>`;
+                box.innerHTML = `<div class="search-result-item" style="opacity: 0.6; cursor: default;">Nenhuma NP encontrada.</div>`;
                 return;
             }
 
@@ -604,12 +668,13 @@ async function main() {
                 const cod = r.COD || "";
                 const descr = r.DESCR || "";
                 const prod = r.PRODUTO || "";
-                const label = `${cod}${prod ? " • " + prod : ""}${descr ? " — " + descr : ""}`;
+                const label = `${cod}${prod ? " • " + prod : ""}`;
+                const subtitle = descr || "";
 
                 return `
-                    <div class="item" data-cod="${cod}" data-prod="${prod}"
-                         style="padding:8px; border-bottom:1px solid var(--border); cursor:pointer;">
-                        <div class="title">${label}</div>
+                    <div class="search-result-item" data-cod="${cod}" data-prod="${prod}">
+                        <div class="search-result-title">${label}</div>
+                        ${subtitle ? `<div class="search-result-subtitle">${subtitle}</div>` : ""}
                     </div>
                 `;
             }).join("");
@@ -702,11 +767,7 @@ async function main() {
         }
     }
 
-    // ========================================
-    // 🔎 VERIFICA DRAFT EXISTENTE
-    // ========================================
     async function getExistingDraft(templateId) {
-
         try {
             const res = await apiGet(`/api/pops/${templateId}/draft`);
 
@@ -723,113 +784,134 @@ async function main() {
         }
     }
 
-
-    // ========================================
-    // 🔥 RENDERSTEPS CORRIGIDO (SEM BUGS)
-    // ========================================
     function renderSteps() {
         const wrap = document.getElementById("stepsList");
+        const emptyState = document.getElementById("emptySteps");
+
         if (!wrap) return;
 
         wrap.innerHTML = "";
 
         if (state.form.STEPS.length === 0) {
-            wrap.innerHTML = "<p style='color:#999;'>Nenhum passo adicionado ainda.</p>";
+            if (emptyState) emptyState.style.display = "block";
             return;
         }
+
+        if (emptyState) emptyState.style.display = "none";
 
         state.form.STEPS.forEach((s, idx) => {
             const div = document.createElement("div");
             div.className = "step-item";
 
             div.innerHTML = `
-                <div class="step-header">
-                    <strong>Passo ${idx + 1}</strong>
-                    <button class="btn-remove" data-i="${idx}">🗑 Remover</button>
+                <div class="step-item-header">
+                    <div class="step-item-number">${idx + 1}</div>
+                    <div style="flex: 1;"></div>
+                    <div class="step-item-actions">
+                        <button class="btn-remove-step" data-i="${idx}" type="button">
+                            🗑️ Remover
+                        </button>
+                    </div>
                 </div>
 
-                <input class="step-input"
-                    data-k="TITLE"
-                    data-i="${idx}"
-                    placeholder="Título do passo"
-                    value="${s.TITLE || ""}"
-                />
-
-                <textarea class="step-textarea"
-                    data-k="INSTRUCTION"
-                    data-i="${idx}"
-                    placeholder="Descreva detalhadamente o que deve ser feito"
-                >${s.INSTRUCTION || ""}</textarea>
-
-                <div class="step-options">
-                    <label class="switch">
-                        <input type="checkbox" 
-                            data-k="REQUIRES_PHOTO" 
+                <div class="step-item-body">
+                    <div class="form-group">
+                        <label class="form-label">Título do Passo</label>
+                        <input class="form-input"
+                            data-k="TITLE"
                             data-i="${idx}"
-                            ${s.REQUIRES_PHOTO ? "checked" : ""}
-                        >
-                        <span class="slider"></span>
-                    </label>
-                    <span>Exigir foto</span>
-                </div>
-
-                <div class="step-options">
-                    <label class="switch">
-                        <input type="checkbox" 
-                            data-k="HAS_TIME" 
-                            data-i="${idx}"
-                            ${s.HAS_TIME ? "checked" : ""}
-                        >
-                        <span class="slider"></span>
-                    </label>
-                    <span>Informar tempo</span>
-                </div>
-
-                ${s.HAS_TIME ? `
-                    <div class="step-time">
-                        ⏱ Tempo estimado (min)
-                        <input type="number" 
-                            min="1" 
-                            data-k="STEP_TIME" 
-                            data-i="${idx}"
-                            value="${s.STEP_TIME || ""}"
+                            placeholder="Ex: Preparar equipamento"
+                            value="${s.TITLE || ""}"
                         />
                     </div>
-                ` : ""}
 
-                <div class="step-photo">
-                    ${s.IMAGE
-                                    ? `<img src="${s.IMAGE}" class="photo-preview" />
-                        <button type="button" class="photo-remove" data-i="${idx}">
-                            Remover foto
-                        </button>`
-                                    : `<button type="button" class="photo-btn" data-i="${idx}">
-                            📷 Adicionar foto do passo
-                        </button>`
-                    }
+                    <div class="form-group">
+                        <label class="form-label">Instruções Detalhadas</label>
+                        <textarea class="form-textarea"
+                            data-k="INSTRUCTION"
+                            data-i="${idx}"
+                            placeholder="Descreva detalhadamente o que deve ser feito neste passo..."
+                            rows="3"
+                        >${s.INSTRUCTION || ""}</textarea>
+                    </div>
+
+                    <div class="toggle-group">
+                        <label class="switch">
+                            <input type="checkbox" 
+                                data-k="REQUIRES_PHOTO" 
+                                data-i="${idx}"
+                                ${s.REQUIRES_PHOTO ? "checked" : ""}
+                            >
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label">📷 Exigir foto neste passo</span>
+                    </div>
+
+                    <div class="toggle-group">
+                        <label class="switch">
+                            <input type="checkbox" 
+                                data-k="HAS_TIME" 
+                                data-i="${idx}"
+                                ${s.HAS_TIME ? "checked" : ""}
+                            >
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label">⏱ Informar tempo estimado</span>
+                    </div>
+
+                    ${s.HAS_TIME ? `
+                        <div class="form-group">
+                            <label class="form-label">⏱ Tempo Estimado (minutos)</label>
+                            <input type="number" 
+                                class="form-input"
+                                min="1" 
+                                data-k="STEP_TIME" 
+                                data-i="${idx}"
+                                value="${s.STEP_TIME || ""}"
+                                placeholder="Ex: 10"
+                            />
+                        </div>
+                    ` : ""}
+
+                    <div class="form-group">
+                        ${s.IMAGE
+                    ? `
+                                <div class="photo-preview-box">
+                                    <img src="${s.IMAGE}" class="photo-preview-img" alt="Foto do passo ${idx + 1}" />
+                                </div>
+                                <button type="button" class="btn photo-remove" data-i="${idx}">
+                                    🗑️ Remover foto
+                                </button>
+                            `
+                    : `
+                                <div class="photo-upload-area" data-i="${idx}" style="cursor: pointer;">
+                                    <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
+                                    <div style="font-weight: 600; margin-bottom: 4px;">Adicionar foto do passo</div>
+                                    <div style="font-size: 0.85rem; color: var(--muted);">
+                                        Clique para fazer upload (máx 5MB)
+                                    </div>
+                                </div>
+                            `
+                }
+                    </div>
                 </div>
-
             `;
 
             wrap.appendChild(div);
         });
 
-        // =============================
-        // INPUTS / CHECKBOX / NUMBER
-        // =============================
+        // Event listeners para inputs
         wrap.querySelectorAll("[data-k]").forEach(el => {
             el.addEventListener("input", e => {
                 const i = Number(e.target.dataset.i);
                 const k = e.target.dataset.k;
 
-                // Toggle "Exigir foto"
                 if (k === "REQUIRES_PHOTO") {
                     state.form.STEPS[i].REQUIRES_PHOTO = e.target.checked;
                     renderSteps();
                     return;
                 }
 
-                // Toggle "Informar tempo"
                 if (k === "HAS_TIME") {
                     state.form.STEPS[i].HAS_TIME = e.target.checked;
                     if (!e.target.checked) {
@@ -839,38 +921,32 @@ async function main() {
                     return;
                 }
 
-                // Inputs normais (text, number, textarea)
                 state.form.STEPS[i][k] = e.target.value;
             });
         });
 
-        // =============================
-        // REMOVER PASSO
-        // =============================
-        wrap.querySelectorAll(".btn-remove").forEach(btn => {
+        // Remover passo
+        wrap.querySelectorAll(".btn-remove-step").forEach(btn => {
             btn.addEventListener("click", () => {
                 const i = Number(btn.dataset.i);
-                if (confirm(`Remover o Passo ${i + 1}?`)) {
+                if (confirm(`Deseja remover o Passo ${i + 1}?`)) {
                     state.form.STEPS.splice(i, 1);
                     renderSteps();
+                    showToast(`Passo ${i + 1} removido`, "info");
                 }
             });
         });
 
-        // =============================
-        // ADICIONAR FOTO
-        // =============================
-        wrap.querySelectorAll(".photo-btn").forEach(btn => {
-            btn.addEventListener("click", async () => { // 👈 async aqui
-                const i = Number(btn.dataset.i);
+        // Upload de foto
+        wrap.querySelectorAll(".photo-upload-area").forEach(area => {
+            area.addEventListener("click", async () => {
+                const i = Number(area.dataset.i);
 
                 if (!state.form.STEPS[i].ID) {
-
-                    toast("Salvando rascunho antes de enviar foto...");
+                    showToast("Salvando rascunho antes de enviar foto...", "info");
 
                     try {
                         await saveDraftPartial();
-
                     } catch (e) {
                         toast("Erro ao salvar antes da foto", true);
                         return;
@@ -898,6 +974,8 @@ async function main() {
                     const form = new FormData();
                     form.append("file", file);
 
+                    showToast("Enviando foto...", "info");
+
                     apiPostFile(`/api/steps/${state.form.STEPS[i].ID}/image`, form)
                         .then(res => {
                             state.form.STEPS[i].IMAGE = res.image_url;
@@ -914,14 +992,15 @@ async function main() {
             });
         });
 
-        // =============================
-        // REMOVER FOTO
-        // =============================
+        // Remover foto
         wrap.querySelectorAll(".photo-remove").forEach(btn => {
             btn.addEventListener("click", () => {
                 const i = Number(btn.dataset.i);
-                state.form.STEPS[i].IMAGE = null;
-                renderSteps();
+                if (confirm("Deseja remover esta foto?")) {
+                    state.form.STEPS[i].IMAGE = null;
+                    renderSteps();
+                    showToast("Foto removida", "info");
+                }
             });
         });
     }
@@ -964,12 +1043,12 @@ async function main() {
 
                 if (hintLink) {
                     const hints = {
-                        MAQUINA: "Aparece na tela de máquinas (manutenção/rotina).",
-                        TAREFA: "Aparece por operação/tarefa do ERP.",
-                        NP: "POP geral por NP (pode ter sequência).",
-                        PECA: "POP por produto/código.",
-                        PECA_OP: "POP específico por produto + NP/Seq.",
-                        SERVICO: "POP genérico (não vincula no ERP).",
+                        MAQUINA: "💡 Aparece na tela de máquinas (manutenção/rotina).",
+                        TAREFA: "💡 Aparece por operação/tarefa do ERP.",
+                        NP: "💡 POP geral por NP (pode ter sequência).",
+                        PECA: "💡 POP por produto/código.",
+                        PECA_OP: "💡 POP específico por produto + NP/Seq.",
+                        SERVICO: "💡 POP genérico (não vincula no ERP).",
                     };
                     hintLink.textContent = hints[state.form.LINK_TYPE] || "";
                 }
@@ -1096,7 +1175,7 @@ async function main() {
                     HAS_TIME: false
                 });
                 renderSteps();
-                toast("Passo adicionado");
+                showToast("Passo adicionado", "success");
             });
         }
 
@@ -1148,10 +1227,15 @@ async function main() {
                     return;
                 }
 
+                btnPublish.disabled = true;
+                btnPublish.innerHTML = `<span style="animation: pulse 1s infinite;">⏳</span> Publicando...`;
+
                 try {
                     const err = validateStep(3);
                     if (err) {
                         toast(err, true);
+                        btnPublish.disabled = false;
+                        btnPublish.innerHTML = `🚀 Publicar POP`;
                         return;
                     }
 
@@ -1165,13 +1249,16 @@ async function main() {
 
                     await apiPost(`/api/pops/${state.draft.TEMPLATE_ID}/publish`);
 
-                    toast("POP publicado com sucesso! ✅");
+                    showToast("POP publicado com sucesso! Redirecionando...", "success");
+
                     setTimeout(() => {
                         window.location.href = "./pop-list.html";
-                    }, 1000);
+                    }, 1500);
                 } catch (e) {
                     console.error("[wizard] Erro ao publicar:", e);
                     toast(`Erro ao publicar: ${e.message}`, true);
+                    btnPublish.disabled = false;
+                    btnPublish.innerHTML = `🚀 Publicar POP`;
                 }
             });
         }
@@ -1206,6 +1293,7 @@ async function main() {
             }
         }
 
+        // Click outside para fechar search boxes
         document.addEventListener("click", (e) => {
             const npBox = document.getElementById("npResults");
             const npQ = document.getElementById("NP_Q");

@@ -4,151 +4,272 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Criar ou editar Procedimento Operacional Padrão (POP)" />
     <title>Cadastrar POP</title>
     <link rel="stylesheet" href="./css/style.css" />
 </head>
 
 <body>
     <div class="container">
-        <div class="topbar">
+        <!-- Header -->
+        <header class="topbar">
             <div>
-                <h1>Cadastrar POP</h1>
-                <div class="sub">Assistente rápido (rascunho salva automático) → Publicar no final.</div>
+                <h1>✨ Assistente de POP</h1>
+                <div class="sub">Crie ou edite procedimentos de forma simples e rápida</div>
             </div>
-            <div style="display:flex; gap:10px;">
-                <a class="btn" href="./pop-list.html">Voltar</a>
+            <div class="top-actions">
+                <a class="btn" href="./pop-list.html" title="Voltar para lista">
+                    ← Voltar
+                </a>
+            </div>
+        </header>
+
+        <!-- Context Banner (modo edit/clone) -->
+        <div id="popContext"></div>
+
+        <!-- Progress Wizard -->
+        <div class="wizard-progress">
+            <div class="wizard-step" data-step="1">
+                <div class="wizard-step-number">1</div>
+                <div class="wizard-step-label">Vínculo</div>
+            </div>
+            <div class="wizard-step-divider"></div>
+            <div class="wizard-step" data-step="2">
+                <div class="wizard-step-number">2</div>
+                <div class="wizard-step-label">Detalhes</div>
+            </div>
+            <div class="wizard-step-divider"></div>
+            <div class="wizard-step" data-step="3">
+                <div class="wizard-step-number">3</div>
+                <div class="wizard-step-label">Conteúdo</div>
+            </div>
+            <div class="wizard-step-divider"></div>
+            <div class="wizard-step" data-step="4">
+                <div class="wizard-step-number">4</div>
+                <div class="wizard-step-label">Revisão</div>
             </div>
         </div>
 
-        <div id="popContext" class="pop-context"></div>
+        <!-- Wizard Content -->
+        <div class="card wizard-card" id="wizard">
 
-        <div class="card" id="wizard">
-
-            <!-- STEP 1 -->
+            <!-- STEP 1: Vínculo -->
             <section class="wstep" data-step="1">
-                <h2>1) Onde esse POP vai aparecer?</h2>
+                <div class="step-header-section">
+                    <h2 class="step-title">🔗 Onde esse POP vai aparecer?</h2>
+                    <p class="step-description">
+                        Escolha o tipo de vínculo para que o POP seja facilmente encontrado
+                    </p>
+                </div>
 
-                <label>Vínculo</label>
-                <select id="LINK_TYPE">
-                    <option value="">Selecione...</option>
-                    <option value="MAQUINA">Máquina</option>
-                    <option value="TAREFA">Operação/Tarefa</option>
-                    <option value="NP">NP</option>
-                    <option value="PECA">Peça</option>
-                    <option value="PECA_OP">Peça + Operação</option>
-                    <option value="SERVICO">Serviço</option>
-                </select>
-
-                <small id="hintLink" class="muted" style="display:block; margin-top:8px;"></small>
+                <div class="form-group">
+                    <label for="LINK_TYPE" class="form-label">
+                        <span class="label-text">Tipo de Vínculo</span>
+                        <span class="label-required">*</span>
+                    </label>
+                    <select id="LINK_TYPE" class="form-select">
+                        <option value="">Selecione uma opção...</option>
+                        <option value="MAQUINA">⚙️ Máquina</option>
+                        <option value="TAREFA">📋 Operação/Tarefa</option>
+                        <option value="NP">📄 NP (Nota de Produção)</option>
+                        <option value="PECA">🔧 Peça</option>
+                        <option value="PECA_OP">🔧 Peça + Operação</option>
+                        <option value="SERVICO">🛠️ Serviço</option>
+                    </select>
+                    <small id="hintLink" class="form-hint"></small>
+                </div>
             </section>
 
-            <!-- STEP 2 -->
+            <!-- STEP 2: Detalhes do Vínculo -->
             <section class="wstep" data-step="2" style="display:none">
-                <h2>2) Detalhe do vínculo</h2>
-
-                <div id="blkMachine" style="display:none; margin-top:10px;">
-                    <label>Máquina</label>
-                    <select id="COD_MAQUINA">
-                        <option value="">Selecione...</option>
-                    </select>
-                    <div class="muted" style="font-size:12px; margin-top:6px;">Puxado de J_MAQUINA</div>
+                <div class="step-header-section">
+                    <h2 class="step-title">📝 Detalhe do vínculo</h2>
+                    <p class="step-description">
+                        Especifique a máquina, tarefa ou produto relacionado
+                    </p>
                 </div>
 
-                <div id="blkTask" style="display:none; margin-top:10px;">
-                    <label>Tarefa</label>
-                    <select id="COD_TAREFA">
-                        <option value="">Selecione...</option>
-                    </select>
-                    <div class="muted" style="font-size:12px; margin-top:6px;">Puxado de J_TAREFAS</div>
-                </div>
-
-                <div id="blkNp" style="display:none; margin-top:10px;">
-                    <label>NP (em produção)</label>
-                
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <input id="NP_Q" placeholder="Buscar por código, descrição ou produto..." autocomplete="off" style="flex:1;" />
-                
-                        <button id="btnNpListar" class="btn" type="button" title="Carregar últimas/primeiras NPs">
-                            Listar
-                        </button>
-                
-                        <button id="btnNpLimpar" class="btn" type="button">
-                            Limpar
-                        </button>
-                    </div>
-                
-                    <div class="muted" style="font-size:12px; margin-top:6px;">
-                        Dica: digite 2+ caracteres para filtrar. Ou clique em <b>Listar</b> para ver opções sem filtro.
-                    </div>
-                
-                    <div id="npResults"
-                        style="display:none; border:1px solid var(--border); border-radius:8px; margin-top:8px; overflow:hidden; max-height:260px; overflow-y:auto;">
-                    </div>
-                
-                    <label style="margin-top:10px;">NP selecionada</label>
-                    <input id="NP_CODIGO" placeholder="Selecione na lista acima" readonly />
-                
-                    <label style="margin-top:10px;">Produto (da NP)</label>
-                    <input id="NP_PRODUTO" placeholder="Auto" readonly />
-                
-                    <label style="margin-top:10px;">Sequência (opcional)</label>
-                    <input id="SEQ_COD" placeholder="Ex: 0010" />
-                
-                    <div class="muted" style="font-size:12px; margin-top:6px;">
-                        Ao selecionar uma NP, o produto pai é preenchido automaticamente.
+                <!-- Máquina -->
+                <div id="blkMachine" class="form-block" style="display:none;">
+                    <div class="form-group">
+                        <label for="COD_MAQUINA" class="form-label">
+                            <span class="label-text">⚙️ Máquina</span>
+                            <span class="label-required">*</span>
+                        </label>
+                        <select id="COD_MAQUINA" class="form-select">
+                            <option value="">Selecione uma máquina...</option>
+                        </select>
+                        <small class="form-hint">Dados de J_MAQUINA</small>
                     </div>
                 </div>
 
-                <div id="blkProduct" style="display:none; margin-top:10px;">
-                    <label>Buscar Produto</label>
-                    <input id="PRODUCT_Q" placeholder="Digite código ou descrição..." autocomplete="off" />
-                
-                    <div id="productResults"
-                        style="display:none; border:1px solid var(--border); border-radius:8px; margin-top:6px; overflow:hidden;">
+                <!-- Tarefa -->
+                <div id="blkTask" class="form-block" style="display:none;">
+                    <div class="form-group">
+                        <label for="COD_TAREFA" class="form-label">
+                            <span class="label-text">📋 Tarefa</span>
+                            <span class="label-required">*</span>
+                        </label>
+                        <select id="COD_TAREFA" class="form-select">
+                            <option value="">Selecione uma tarefa...</option>
+                        </select>
+                        <small class="form-hint">Dados de J_TAREFAS</small>
                     </div>
-                
-                    <label style="margin-top:10px;">Produto selecionado</label>
-                    <input id="PRODUCT_CODE" placeholder="Selecione acima" readonly />
+                </div>
+
+                <!-- NP -->
+                <div id="blkNp" class="form-block" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="label-text">📄 NP (em produção)</span>
+                            <span class="label-required">*</span>
+                        </label>
+
+                        <div class="search-input-group">
+                            <input id="NP_Q" type="search" class="form-input"
+                                placeholder="🔍 Buscar por código, descrição ou produto..." autocomplete="off" />
+                            <button id="btnNpListar" class="btn btn-secondary" type="button" title="Listar NPs">
+                                📋 Listar
+                            </button>
+                            <button id="btnNpLimpar" class="btn" type="button" title="Limpar busca">
+                                🗑️
+                            </button>
+                        </div>
+
+                        <small class="form-hint">
+                            💡 Digite 2+ caracteres para filtrar ou clique em <b>Listar</b>
+                        </small>
+                    </div>
+
+                    <div id="npResults" class="search-results" style="display:none;"></div>
+
+                    <div class="form-group">
+                        <label for="NP_CODIGO" class="form-label">NP Selecionada</label>
+                        <input id="NP_CODIGO" class="form-input" placeholder="Selecione na lista acima" readonly />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="NP_PRODUTO" class="form-label">Produto (da NP)</label>
+                        <input id="NP_PRODUTO" class="form-input" placeholder="Preenchido automaticamente" readonly />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="SEQ_COD" class="form-label">Sequência (opcional)</label>
+                        <input id="SEQ_COD" class="form-input" placeholder="Ex: 0010" />
+                        <small class="form-hint">Opcional: especifique a sequência da operação</small>
+                    </div>
+                </div>
+
+                <!-- Produto -->
+                <div id="blkProduct" class="form-block" style="display:none;">
+                    <div class="form-group">
+                        <label for="PRODUCT_Q" class="form-label">
+                            <span class="label-text">🔧 Buscar Produto</span>
+                            <span class="label-required">*</span>
+                        </label>
+                        <input id="PRODUCT_Q" type="search" class="form-input"
+                            placeholder="🔍 Digite código ou descrição..." autocomplete="off" />
+                    </div>
+
+                    <div id="productResults" class="search-results" style="display:none;"></div>
+
+                    <div class="form-group">
+                        <label for="PRODUCT_CODE" class="form-label">Produto Selecionado</label>
+                        <input id="PRODUCT_CODE" class="form-input" placeholder="Selecione acima" readonly />
+                    </div>
                 </div>
             </section>
 
-            <!-- STEP 3 -->
+            <!-- STEP 3: Conteúdo -->
             <section class="wstep" data-step="3" style="display:none">
-                <h2>3) Conteúdo</h2>
+                <div class="step-header-section">
+                    <h2 class="step-title">📝 Conteúdo do POP</h2>
+                    <p class="step-description">
+                        Defina o título, descrição e os passos do procedimento
+                    </p>
+                </div>
 
-                <label>Título</label>
-                <input id="TITLE" placeholder="Ex: Ligar máquina / Setup / Limpeza..." />
+                <div class="form-group">
+                    <label for="TITLE" class="form-label">
+                        <span class="label-text">Título do POP</span>
+                        <span class="label-required">*</span>
+                    </label>
+                    <input id="TITLE" class="form-input" placeholder="Ex: Ligar máquina, Setup, Limpeza preventiva..."
+                        maxlength="200" />
+                    <small class="form-hint">Nome claro e descritivo do procedimento</small>
+                </div>
 
-                <label style="margin-top:10px;">Descrição</label>
-                <textarea id="DESCRIPTION" placeholder="Resumo do POP"></textarea>
+                <div class="form-group">
+                    <label for="DESCRIPTION" class="form-label">Descrição</label>
+                    <textarea id="DESCRIPTION" class="form-textarea"
+                        placeholder="Resumo ou objetivo deste POP (opcional)" rows="3"></textarea>
+                </div>
 
-                <h3 style="margin-top:14px;">Passos</h3>
-                <div id="stepsList"></div>
+                <div class="divider"></div>
 
-                <button id="btnAddStep" class="btn" type="button" style="margin-top:10px;">
-                    + Adicionar passo
-                </button>
+                <div class="steps-section">
+                    <div class="steps-header">
+                        <h3 class="section-subtitle">📋 Passos do Procedimento</h3>
+                        <button id="btnAddStep" class="btn btn-add-step" type="button">
+                            ➕ Adicionar Passo
+                        </button>
+                    </div>
+
+                    <div id="stepsList" class="steps-list"></div>
+
+                    <div id="emptySteps" class="empty-state-small" style="display:none;">
+                        <div class="empty-icon-small">📝</div>
+                        <div class="empty-text-small">
+                            Nenhum passo adicionado ainda.<br>
+                            Clique em <b>Adicionar Passo</b> para começar.
+                        </div>
+                    </div>
+                </div>
             </section>
 
-            <!-- STEP 4 -->
+            <!-- STEP 4: Revisão -->
             <section class="wstep" data-step="4" style="display:none">
-                <h2>4) Revisão</h2>
-                <pre id="review" style="white-space:pre-wrap;"></pre>
+                <div class="step-header-section">
+                    <h2 class="step-title">✅ Revisão Final</h2>
+                    <p class="step-description">
+                        Revise todas as informações antes de publicar
+                    </p>
+                </div>
 
-                <button id="btnPublish" class="btn primary" type="button">
-                    Publicar
-                </button>
+                <div class="review-container">
+                    <pre id="review" class="review-content"></pre>
+                </div>
+
+                <div class="form-actions">
+                    <button id="btnPublish" class="btn btn-publish" type="button">
+                        🚀 Publicar POP
+                    </button>
+                    <small class="form-hint" style="margin-top: 10px; display: block;">
+                        ⚠️ Após publicar, o POP ficará disponível para consulta
+                    </small>
+                </div>
             </section>
 
-            <hr class="sep" />
+            <!-- Wizard Navigation -->
+            <div class="wizard-navigation">
+                <button id="btnBack" class="btn btn-wizard-back" type="button" disabled>
+                    ← Voltar
+                </button>
 
-            <div style="margin-top:16px; display:flex; gap:8px; align-items:center;">
-                <button id="btnBack" class="btn" type="button">Voltar</button>
-                <button id="btnNext" class="btn primary" type="button">Avançar</button>
-                <span id="statusMsg" class="muted" style="margin-left:8px;"></span>
+                <div class="wizard-status">
+                    <span id="statusMsg" class="status-message"></span>
+                </div>
+
+                <button id="btnNext" class="btn primary btn-wizard-next" type="button">
+                    Avançar →
+                </button>
             </div>
+        </div>
 
+        <!-- Auto-save indicator -->
+        <div id="autoSaveIndicator" class="auto-save-indicator" style="display:none;">
+            💾 Salvando automaticamente...
         </div>
     </div>
 

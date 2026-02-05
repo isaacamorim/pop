@@ -1,6 +1,6 @@
 # backend/routes/pops.py
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models.pop_template import PopTemplate
 from models.pop_version import PopVersion
@@ -110,6 +110,8 @@ def create_draft():
     )
     db.session.add(l)
     db.session.flush()  # pega IPL_ID
+
+    gravar_log(t.IPT_ID, f"SYSALL -> POP | CRIAR | {t.IPT_CODE}")
 
     db.session.commit()
 
@@ -385,6 +387,8 @@ def publish(template_id: str):
             {"lid": l.IPL_ID},
         )
 
+    gravar_log(t.IPT_ID, f"SYSALL -> POP | CRIAR | {t.IPT_CODE}")
+
     db.session.commit()
 
     return jsonify(
@@ -521,19 +525,19 @@ def get_pop(template_id: str):
     vid = row.get("VERSION_ID") or row.get("version_id")
 
     steps_sql = """
-        SELECT
-            s.IPS_ID AS STEP_ID,
-            s.IPS_SEQ AS SEQ,
-            s.IPS_TITLE AS TITLE,
-            s.IPS_INSTRUCTION AS INSTRUCTION,
-            s.IPS_REQ_PHOTO AS REQUIRES_PHOTO,
-            s.IPS_REQ_SIGN  AS REQUIRES_SIGNATURE,
-            s.IPS_IMAGE_URL AS IMAGE_URL,
-            s.IPS_STEP_TIME AS STEP_TIME
-        FROM SYSALL.I_POP_STEP s
-        WHERE s.IPS_VERSION_ID = :vid
-        ORDER BY s.IPS_SEQ ASC
-    """
+                    SELECT
+                        s.IPS_ID AS STEP_ID,
+                        s.IPS_SEQ AS SEQ,
+                        s.IPS_TITLE AS TITLE,
+                        s.IPS_INSTRUCTION AS INSTRUCTION,
+                        s.IPS_REQ_PHOTO AS REQUIRES_PHOTO,
+                        s.IPS_REQ_SIGN  AS REQUIRES_SIGNATURE,
+                        s.IPS_IMAGE_URL AS IMAGE_URL,
+                        s.IPS_STEP_TIME AS STEP_TIME
+                    FROM SYSALL.I_POP_STEP s
+                    WHERE s.IPS_VERSION_ID = :vid
+                    ORDER BY s.IPS_SEQ ASC
+                """
 
     steps = []
     if vid is not None:
@@ -774,3 +778,39 @@ def get_active_draft(template_id):
         return jsonify({"exists": False})
 
     return jsonify({"exists": True, "version_id": row[0], "version_num": row[1]})
+
+
+TELA_POP = 1130  # código liberado no ERP para a tela do I_POP_TEMPLATE
+
+def gravar_log(chave, funcao, tela=1130, empresa=1):
+
+    try:
+
+        # 🔥 pega usuário da sessão
+        usuario = session.get("user", {}).get("usuario") or "SISTEMA"
+
+        db.session.execute(
+            text(
+                """
+            BEGIN
+                GRAVAR_LOG(
+                    p_CHAVE   => :chave,
+                    p_TELA    => :tela,
+                    p_FUNCAO  => :funcao,
+                    p_EMPRESA => :empresa,
+                    p_USUARI  => :usuario
+                );
+            END;
+            """
+            ),
+            {
+                "chave": str(chave),
+                "tela": int(tela),
+                "funcao": funcao[:2000],
+                "empresa": int(empresa),
+                "usuario": usuario[:30],  # limite da coluna
+            },
+        )
+
+    except Exception as e:
+        print("⚠️ ERRO AO GRAVAR LOG:", e)

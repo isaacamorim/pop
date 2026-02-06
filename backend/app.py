@@ -7,6 +7,7 @@ from flask_cors import CORS
 
 from oracle_client import init_oracle_thick
 
+print("🔥 ESTE APP.PY FOI CARREGADO 🔥")
 
 def create_app():
     app = Flask(__name__)
@@ -23,15 +24,17 @@ def create_app():
     CORS(
         app,
         supports_credentials=True,
-        resources={
-            r"/api/*": {
-                "origins": [
-                    "http://127.0.0.1:5500",
-                    "http://localhost:5500",
-                    "http://10.42.92.78:5500", # ip da maquina
-                ]
-            }
-        },
+        origins=[
+            "http://127.0.0.1:8080",
+            "http://localhost:8080",
+            "http://10.42.92.200:8080",
+            # dev
+            "http://127.0.0.1:5500",
+            "http://localhost:5500",
+            "http://10.42.92.200:5500",
+        ],
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     )
 
     # ATIVA THICK ANTES DO SQLALCHEMY
@@ -46,11 +49,15 @@ def create_app():
 
     from routes import register_blueprints
 
+    print("ROTAS REGISTRADAS:")
+    for r in app.url_map.iter_rules():
+        print(r)
     register_blueprints(app)
 
     return app
 
 
+
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8100, debug=True)
